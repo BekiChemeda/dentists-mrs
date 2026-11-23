@@ -1,4 +1,4 @@
-# Clinic MRS manuals
+# Dental MRS manuals
 
 One manual per job. Each one covers what that person does every day, step by step, and what to do
 when something unusual happens. Staff only need their own manual; the menu on the left of the
@@ -7,9 +7,13 @@ screen shows only what their role may use.
 | Manual | For |
 | --- | --- |
 | [Getting started](getting-started.md) | Everyone: signing in, passwords, two-step sign-in, finding a patient, light and dark mode |
+| [Dentist](dentist.md) | Examinations, the dental and periodontal charts, diagnoses, treatment plans, procedures, prescriptions, images, recalls |
+| [Dental assistant](dental-assistant.md) | Charting for the dentist, procedure records and materials, images |
+| [Dental receptionist](dental-receptionist.md) | What is different at a dental reception: appointment types, chairs, recalls (read with the receptionist manual) |
+| [Dental clinic administrator](dental-clinic-administrator.md) | Chairs, the dental catalogue and prices, modules, dental reports (read with the clinic administrator manual) |
 | [Receptionist](receptionist.md) | Registration, appointments, the waiting list, closing visits |
-| [Nurse](nurse.md) | Triage and vital signs |
-| [Doctor](doctor.md) | Consultations, diagnoses, tests, prescriptions, referrals and certificates |
+| [Nurse](nurse.md) | Triage and vital signs (only if the clinic uses triage) |
+| [Doctor](doctor.md) | Medical consultations, if the clinic also has medical doctors |
 | [Laboratory](laboratory.md) | Specimens, results, verification, corrections and reports |
 | [Pharmacy](pharmacy.md) | Dispensing, stock, the controlled-medicine register |
 | [Cashier](cashier.md) | Invoices, payments, receipts, discounts, refunds, cash-up |
