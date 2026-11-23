@@ -242,7 +242,7 @@ class AppointmentListCreateView(PermissionedView):
                                            "message": "The consultation belongs to another patient."}}, status=400)
         appt = services.book_appointment(self.ctx(), patient=_patient(data["patient_id"]),
                                          doctor=_doctor(data["doctor_id"]), scheduled_at=data["scheduled_at"],
-                                         duration_minutes=data["duration_minutes"], reason=data["reason"],
+                                         duration_minutes=data.get("duration_minutes"), reason=data["reason"],
                                          notes=data["notes"], service=_service(data.get("service_id")),
                                          source_encounter=encounter,
                                          appointment_type=_appointment_type(data.get("appointment_type_id")),

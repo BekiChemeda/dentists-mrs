@@ -75,7 +75,9 @@ def create_record(ctx: ActorContext, encounter: DentalEncounter, data: dict) -> 
         if procedure is None:
             raise BusinessValidationError("Choose the procedure.", fields={"procedure_id": ["Required."]})
         where = _clean_item_location(procedure, data)
-    performer = _performer(data.get("performed_by_id") or ctx.user.pk)
+    # An assistant preparing the record: the examining dentist performs it unless someone else is named.
+    default = ctx.user.pk if ctx.user.has_permissions(["dental.procedure.sign"]) else enc.dentist_id
+    performer = _performer(data.get("performed_by_id") or default)
     _check_role_policy(procedure, performer)
     assistant = None
     if data.get("assisted_by_id"):
