@@ -27,3 +27,6 @@ frontend/dist/
 *.key
 *.licence
 vendor-tools/*.pem
+
+# Dental image files stored by a development server (never commit images)
+backend/var/
