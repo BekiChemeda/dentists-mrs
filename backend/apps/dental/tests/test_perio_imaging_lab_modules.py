@@ -21,6 +21,24 @@ def _sign_exam(dental, enc):
 
 
 # --------------------------------------------------------------------------- periodontal
+def test_unticked_boxes_on_probed_sites_count_as_no(dental, exam):
+    """The screen sends nothing for an unticked box. A probed site without a bleeding tick did not bleed; plaque is
+    only counted once it is recorded somewhere in the chart, so a chart without plaque scores shows no plaque %."""
+    p, v, enc = exam()
+    url = f"/api/v1/dental/encounters/{enc['id']}/perio/"
+    sites = {site: {"probing_depth_mm": 3, "gingival_margin_mm": 0} for site in ("MB", "B", "DB", "ML", "L", "DL")}
+    sites["MB"]["bleeding"] = True
+    out = ok(dental.dental_hygienist.put(url, {"teeth": [{"tooth": 46, "sites": sites},
+                                                         {"tooth": 47, "sites": {"B": {"probing_depth_mm": 2}}}]},
+                                         format="json"))
+    assert out["summary"]["bleeding"] == {"positive": 1, "assessed": 7, "percent": 14.3}
+    assert out["summary"]["plaque"] == {"positive": 0, "assessed": 0, "percent": None}
+    sites["L"]["plaque"] = True
+    out = ok(dental.dental_hygienist.put(url, {"version": out["version"], "teeth": [{"tooth": 46, "sites": sites}]},
+                                         format="json"))
+    assert out["summary"]["plaque"] == {"positive": 1, "assessed": 6, "percent": 16.7}
+
+
 def test_perio_entry_validation_and_calculations(dental, exam):
     p, v, enc = exam()
     url = f"/api/v1/dental/encounters/{enc['id']}/perio/"
@@ -41,7 +59,9 @@ def test_perio_entry_validation_and_calculations(dental, exam):
     assert t11["sites"]["B"]["cal_mm"] == 1
     s = exam_out["summary"]
     assert s["bleeding"] == {"positive": 1, "assessed": 3, "percent": 33.3}
-    assert s["plaque"]["assessed"] == 2 and s["pd_4_or_more"] == 1 and s["teeth_missing"] == 1
+    # Plaque is recorded in this chart, so the probed site on 11 with no tick counts as "no plaque".
+    assert s["plaque"] == {"positive": 1, "assessed": 3, "percent": 33.3}
+    assert s["pd_4_or_more"] == 1 and s["teeth_missing"] == 1
     assert s["sites_not_measured"] == 1
     version = exam_out["version"]
     # Out-of-range values are refused, never changed.

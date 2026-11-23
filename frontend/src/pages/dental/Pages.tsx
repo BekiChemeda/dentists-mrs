@@ -30,7 +30,7 @@ import { ImagesPanel } from "./Images";
 import { PerioHistory } from "./Perio";
 import { PlanList } from "./Plans";
 import { ProcedureDetail, ProcedureTable } from "./Procedures";
-import { ProfilePanel } from "./Workspace";
+import { AlertStrip, ProfilePanel } from "./Workspace";
 import type {
   DentalProcedure,
   DentalSummary,
@@ -100,15 +100,7 @@ export function DentalPatientPage() {
       <Modal open={labCase} title={t("dental.new_case", "New laboratory case")} onClose={() => setLabCase(false)}>
         {labCase && <NewLabCase patientId={id} onDone={() => setLabCase(false)} />}
       </Modal>
-      <div className="alert-strip">
-        <strong>{t("dental.alerts", "Alerts")}:</strong>{" "}
-        {s.shared_history.allergies.length
-          ? s.shared_history.allergies.map((a) => `${a.substance} (${a.severity})`).join(", ")
-          : t("dental.no_allergies", "No allergies recorded")}
-        {s.risk_review
-          ? ` · ${t("dental.reviewed", "Medical history reviewed")} ${formatDateTime(s.risk_review.reviewed_at)}`
-          : ` · ${t("dental.no_review", "No medical history review yet")}`}
-      </div>
+      <AlertStrip summary={s} />
       <Tabs tabs={tabs} value={tab} onChange={(k) => setParams({ tab: k }, { replace: true })} />
       {tab === "overview" && (
         <div className="split">

@@ -20,7 +20,9 @@ shown as blank, never as zero.
 - **Clinical attachment level (CAL)** = probing depth + gingival margin, where the gingival margin is the distance
   from the cemento-enamel junction (CEJ) to the gingival margin, **positive when the margin is apical to the CEJ
   (recession)** and negative when coronal (enlargement). CAL is shown only when both values exist.
-- **Bleeding on probing %** = sites with bleeding ÷ sites where bleeding was assessed. **Plaque %** likewise.
+- **Bleeding on probing %** = sites with bleeding ÷ sites probed (an unticked box on a probed site means no bleeding).
+  **Plaque %** and **suppuration %** likewise, once plaque or suppuration is recorded anywhere in the chart; before that
+  they show as not recorded rather than 0%.
   Both are shown with the count of sites assessed.
 - **Counts** of sites with PD ≥ 4 mm and ≥ 6 mm.
 

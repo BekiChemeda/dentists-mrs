@@ -103,6 +103,26 @@ def _clean_tooth(row: dict) -> tuple[dict, list[dict]]:
     return tooth_row, sites
 
 
+def _fill_unticked(exam: PeriodontalExam, cleaned: list, numbers: list[int]) -> None:
+    """
+    A ticked box means yes; an unticked box on a probed site means no, not "not assessed":
+    - bleeding on probing is assessed whenever the site is probed;
+    - plaque and suppuration count as assessed on probed sites once they are recorded anywhere in this chart.
+    Sites that were not probed keep "not assessed", so percentages stay honest.
+    """
+    probed = [site for _, sites in cleaned for site in sites if site["probing_depth_mm"] is not None]
+    for site in probed:
+        if site["bleeding"] is None:
+            site["bleeding"] = False
+    for flag in ("plaque", "suppuration"):
+        recorded = any(site[flag] for _, sites in cleaned for site in sites) or (
+            PeriodontalSite.objects.filter(exam=exam, **{flag: True}).exclude(tooth__in=numbers).exists())
+        if recorded:
+            for site in probed:
+                if site[flag] is None:
+                    site[flag] = False
+
+
 @transaction.atomic
 def save_exam(ctx: ActorContext, encounter: DentalEncounter, data: dict, *, version: int | None) -> PeriodontalExam:
     """
@@ -127,6 +147,7 @@ def save_exam(ctx: ActorContext, encounter: DentalEncounter, data: dict, *, vers
     numbers = [t["tooth"] for t, _ in cleaned]
     if len(numbers) != len(set(numbers)):
         raise BusinessValidationError("A tooth appears twice.", fields={"teeth": ["Duplicate tooth."]})
+    _fill_unticked(exam, cleaned, numbers)
     if numbers:
         PeriodontalSite.objects.filter(exam=exam, tooth__in=numbers).delete()
         PeriodontalTooth.objects.filter(exam=exam, tooth__in=numbers).delete()
@@ -175,7 +196,8 @@ def summary(exam: PeriodontalExam) -> dict:
         "pd_4_or_more": sum(1 for d in depths if d >= 4), "pd_6_or_more": sum(1 for d in depths if d >= 6),
         "deepest_pd": max(depths) if depths else None,
         "formula": "CAL = probing depth + gingival margin (margin measured from the CEJ, positive when apical). "
-                   "Percentages are of sites assessed. Pending dentist review.",
+                   "Bleeding: of the sites probed. Plaque and suppuration: of the sites probed, once recorded in this chart. "
+                   "Pending dentist review.",
     }
 
 

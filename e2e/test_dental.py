@@ -63,7 +63,7 @@ def test_toothache_to_filling_invoice_and_follow_up(as_role, unique):
         select.select_option(index=1)
     review.locator("label.check input").first.check()
     dr.get_by_role("button", name="Record review").click()
-    expect(dr.locator("main")).to_contain_text("Reviewed")
+    expect(dr.locator(".alert-strip")).to_contain_text("Medical history reviewed")
 
     # Complaint: type, look at the chart, come back: the text is still there and the tab shows unsaved work.
     _tab(dr, "Complaint & examination")

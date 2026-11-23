@@ -125,9 +125,13 @@ export function DentalWorkspace() {
   );
 }
 
-function AlertStrip({ summary }: { summary?: DentalSummary }) {
+/** Allergies and the "yes" answers of the last medical history review: shown on every dental page of a patient. */
+export function AlertStrip({ summary }: { summary?: DentalSummary }) {
   const { t } = useTranslation();
+  const catalog = useDentalCatalog();
   if (!summary) return null;
+  const question = (key: string) =>
+    catalog.data?.risk_questions.find(([k]) => k === key)?.[1] ?? key.replace(/_/g, " ");
   const a = summary.shared_history.allergies;
   const yes = summary.risk_review
     ? Object.entries(summary.risk_review.answers).filter(([, v]) => v.answer === "yes")
@@ -138,10 +142,10 @@ function AlertStrip({ summary }: { summary?: DentalSummary }) {
       {a.length
         ? a.map((x) => `${x.substance} (${x.severity})`).join(", ")
         : t("dental.no_allergies", "No allergies recorded")}
-      {yes.length > 0 && ` · ${yes.map(([k, v]) => `${k.replace("_", " ")}: ${v.detail}`).join("; ")}`}
+      {yes.length > 0 && ` · ${yes.map(([k, v]) => `${question(k)}: ${v.detail}`).join("; ")}`}
       {!summary.risk_review && ` · ${t("dental.no_review", "No medical history review yet")}`}
       {summary.risk_review &&
-        ` · ${t("dental.reviewed", "Reviewed")} ${formatDateTime(summary.risk_review.reviewed_at)}`}
+        ` · ${t("dental.reviewed", "Medical history reviewed")} ${formatDateTime(summary.risk_review.reviewed_at)}`}
     </div>
   );
 }

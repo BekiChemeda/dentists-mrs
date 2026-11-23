@@ -104,8 +104,32 @@ class Command(BaseCommand):
                                                        start_date=datetime.date(2025, 9, 11))
         self.stdout.write(f"Demo staff ready (password: {DEMO_PASSWORD}).")
 
+    # code, name, category, unit, pack unit, units per pack, reorder level, selling price (synthetic demo values)
+    DENTAL_ITEMS = [
+        ("DEMO-COMP-A2", "Composite resin A2 (4 g syringe)", "restorative", "syringe", "box", 5, 4, 650),
+        ("DEMO-BOND", "Bonding agent (5 ml)", "restorative", "bottle", "", None, 2, 900),
+        ("DEMO-ETCH", "Etching gel 37% (3 ml)", "restorative", "syringe", "box", 3, 3, 250),
+        ("DEMO-GIC", "Glass ionomer cement kit", "restorative", "kit", "", None, 1, 1800),
+        ("DEMO-LIDO", "Lidocaine 2% with adrenaline (1.8 ml cartridge)", "anaesthetic", "cartridge", "box", 50, 50, 35),
+        ("DEMO-NEEDLE", "Dental needle 27G short", "anaesthetic", "needle", "box", 100, 100, 8),
+        ("DEMO-GP", "Gutta-percha points (assorted)", "endodontic", "box", "", None, 2, 450),
+        ("DEMO-ALG", "Alginate impression material (450 g)", "impression", "bag", "", None, 2, 700),
+        ("DEMO-GLOVE", "Examination gloves (pair)", "infection_control", "pair", "box", 50, 100, 6),
+        ("DEMO-POUCH", "Sterilisation pouches", "sterilisation", "pouch", "box", 200, 200, 2),
+        ("DEMO-MIRROR", "Mouth mirror", "instrument", "piece", "", None, 10, 120),
+    ]
+
+    def _dental_items(self):
+        """Synthetic dental supplies, so procedure records can list materials in the demo."""
+        for code, name, category, unit, pack, per_pack, reorder, price in self.DENTAL_ITEMS:
+            Item.objects.get_or_create(code=code, defaults=dict(
+                name=name, category=category, unit=unit, pack_unit=pack,
+                units_per_pack=Decimal(per_pack) if per_pack else None, reorder_level=Decimal(reorder),
+                selling_price=Decimal(price)))
+
     @transaction.atomic
     def _stock(self, actor, rng):
+        self._dental_items()
         supplier, _ = Supplier.objects.get_or_create(name="Demo Pharmaceutical Supplier PLC")
         today = timezone.localdate()
         lines = []
