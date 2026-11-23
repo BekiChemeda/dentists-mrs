@@ -27,6 +27,11 @@ never dental notes, charts or images.
 
 Price changes apply to new charges only. Issued invoices keep the price they were issued with.
 
+Orthodontic package and per-visit prices are agreed per patient and set on the case by the dentist. Agree a
+clinic policy first (clinical review log R-16): standard package prices, deposit, number of instalments, which
+visits are charged, and what happens when treatment stops. The **Orthodontic instalments** report lists what is
+due and overdue.
+
 ## Modules
 
 The system administrator switches modules under *System › Modules*. A new dental installation starts with
@@ -38,8 +43,10 @@ triage, laboratory (medical) and pharmacy off. The dental options are:
 | Dental imaging | No uploads or viewing; files stay on the server and in backups |
 | Dental laboratory | No laboratory cases |
 | Recalls | No recall list |
+| Orthodontics | No orthodontic assessments, cases or instalments |
 
-A module cannot be switched off while it has unfinished work (for example a laboratory case not yet delivered).
+A module cannot be switched off while it has unfinished work (for example a laboratory case not yet delivered, or
+an orthodontic case still open or an instalment not yet invoiced).
 Nothing is deleted when a module is switched off.
 
 ## Reports

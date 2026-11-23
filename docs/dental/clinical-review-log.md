@@ -20,6 +20,8 @@ signed off (name, registration, date, decision) before a pilot. Until then, all 
 | R-12 | Hygienist scope | `permissions.md` | What may a hygienist record and sign in your clinic? | Open |
 | R-13 | Image types | `DentalImage.Kind` | Correct list? Any modality you would need DICOM for? | Open |
 | R-14 | Anaesthesia record | Procedure record | Free text today (agent, amount, technique written by the dentist). Should it be structured? No doses are suggested by the system. | Open |
+| R-15 | Orthodontic assessment and visits | `OrthoAssessment`, `OrthoVisit.Kind`, `OrthoCase.Appliance`, `OrthoCase.Retainer` ([orthodontics.md](orthodontics.md)) | Are the fields (Angle class per side, incisor relationship, overjet/overbite in mm, crowding and spacing grades, skeletal pattern, profile) what the clinic records? Are the visit types, appliance and retainer lists right? Should an index such as IOTN be added? | Open |
+| R-16 | Orthodontic charging | `OrthoCase` billing, instalments | Clinic policy, not clinical: package with deposit and instalments, or per visit; which visit types are charged per visit by default (adjustment, aligner, emergency, retention review); what happens to the balance when treatment is discontinued (today: instalments not yet invoiced are cancelled, issued invoices stay). | Open |
 
 ## Sign-off
 

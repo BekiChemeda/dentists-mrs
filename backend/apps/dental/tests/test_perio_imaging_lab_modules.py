@@ -276,6 +276,7 @@ def test_default_roles_follow_the_permission_matrix(db):
 
     assert "dental.write" in perms("dentist") and "dental.write" not in perms("dental_assistant")
     assert "dental.procedure.sign" not in perms("dental_assistant")
+    assert "dental.ortho.manage" in perms("dentist") and "dental.ortho.manage" not in perms("dental_assistant")
     assert perms("dental_technician") == {"dental.labcase.work"}
     assert not any(c.startswith("dental.") for c in perms("system_admin"))
     assert not {"dental.view"} & perms("receptionist") and "dental.recall.manage" in perms("receptionist")

@@ -287,7 +287,7 @@ function NewInvoiceForm({ onDone }: { onDone: (inv: Invoice) => void }) {
 export function InvoicePage() {
   const { id = "" } = useParams();
   const { t } = useTranslation();
-  const { can, user } = useAuth();
+  const { can, user, moduleOn } = useAuth();
   const inv = useGet<Invoice>(["invoice", id], `/billing/invoices/${id}/`);
   // Approvals for this invoice (discount, void) and for its payments (refunds).
   const objectIds = [id, ...(inv.data?.payments ?? []).map((p) => p.id)].join(",");
@@ -390,9 +390,11 @@ export function InvoicePage() {
           actions={
             draft &&
             can("billing.invoice") &&
-            i.visit && (
+            (i.visit || moduleOn("orthodontics")) && (
               <button className="btn btn-sm" onClick={() => act.mutate({ action: "pull-charges" })}>
-                {t("billing.pull", "Add visit charges")}
+                {i.visit
+                  ? t("billing.pull", "Add visit charges")
+                  : t("billing.pull_instalments", "Add orthodontic instalments due")}
               </button>
             )
           }

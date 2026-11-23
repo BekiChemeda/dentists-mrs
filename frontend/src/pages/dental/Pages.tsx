@@ -27,6 +27,7 @@ import { formatDateTime } from "../../lib/format";
 import { ChartView } from "./ChartView";
 import { DentalStatus, PENDING_REVIEW_NOTE, useDentalCatalog } from "./common";
 import { ImagesPanel } from "./Images";
+import { OrthoPanel } from "./Ortho";
 import { PerioHistory } from "./Perio";
 import { PlanList } from "./Plans";
 import { ProcedureDetail, ProcedureTable } from "./Procedures";
@@ -45,7 +46,7 @@ import type {
 // ===========================================================================
 // Patient dental record
 // ===========================================================================
-type RecordTab = "overview" | "chart" | "perio" | "plans" | "procedures" | "images" | "recalls";
+type RecordTab = "overview" | "chart" | "perio" | "plans" | "procedures" | "images" | "recalls" | "ortho";
 
 export function DentalPatientPage() {
   const { id = "" } = useParams();
@@ -78,6 +79,7 @@ export function DentalPatientPage() {
       ? [{ key: "images" as const, label: t("dental.tab_images", "Images") }]
       : []),
     ...(moduleOn("recalls") ? [{ key: "recalls" as const, label: t("dental.recalls", "Recalls") }] : []),
+    ...(moduleOn("orthodontics") ? [{ key: "ortho" as const, label: t("dental.tab_ortho", "Orthodontics") }] : []),
   ];
   return (
     <div className="stack">
@@ -168,6 +170,7 @@ export function DentalPatientPage() {
         </Panel>
       )}
       {tab === "images" && <ImagesPanel patientId={id} />}
+      {tab === "ortho" && <OrthoPanel patientId={id} />}
       {tab === "recalls" && <PatientRecalls patientId={id} />}
     </div>
   );

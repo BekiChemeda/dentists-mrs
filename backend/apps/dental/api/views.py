@@ -20,7 +20,8 @@ from apps.scheduling.models import Appointment, Visit
 from .. import teeth
 from ..models import (
     DentalDiagnosis, DentalDiagnosisTerm, DentalEncounter, DentalImage, DentalLabCase, DentalProcedure, FindingType,
-    MedicalRiskReview, PeriodontalExam, ProcedureRecord, Recall, ToothFinding, TreatmentPlan, TreatmentPlanItem,
+    MedicalRiskReview, OrthoAssessment, OrthoCase, OrthoVisit, PeriodontalExam, ProcedureRecord, Recall, ToothFinding,
+    TreatmentPlan, TreatmentPlanItem,
 )
 from ..services import catalog as catalog_svc
 from ..services import chart, encounters, imaging, labcases, perio, plans, procedures, recalls
@@ -66,6 +67,14 @@ class CatalogView(PermissionedView):
             "image_kinds": DentalImage.Kind.choices, "recall_kinds": Recall.Kind.choices,
             "lab_case_types": DentalLabCase.CaseType.choices,
             "plan_item_priorities": TreatmentPlanItem.Priority.choices,
+            "ortho": {
+                "appliances": OrthoCase.Appliance.choices, "arches": OrthoCase.Arches.choices,
+                "billing_modes": OrthoCase.Billing.choices, "retainers": OrthoCase.Retainer.choices,
+                "visit_kinds": OrthoVisit.Kind.choices, "angle": OrthoAssessment.Angle.choices,
+                "incisor": OrthoAssessment.Incisor.choices, "severity": OrthoAssessment.Severity.choices,
+                "skeletal": OrthoAssessment.Skeletal.choices, "profile": OrthoAssessment.Profile.choices,
+                "hygiene": OrthoAssessment.Hygiene.choices,
+            },
         })
 
 

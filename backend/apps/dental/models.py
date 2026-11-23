@@ -923,3 +923,281 @@ class DentalLabCaseEvent(models.Model):
         db_table = "dental_lab_case_event"
         ordering = ["created_at", "id"]
 
+
+
+# ===========================================================================
+# Orthodontics (module "orthodontics"). Starter vocabulary pending clinical review (R-15).
+# ===========================================================================
+class OrthoAssessment(Versioned, TimestampedModel):
+    """The orthodontic assessment recorded in a dental examination. Editable while that examination is a draft."""
+
+    class Angle(models.TextChoices):
+        CLASS_I = "class_i", "Class I"
+        CLASS_II = "class_ii", "Class II"
+        CLASS_III = "class_iii", "Class III"
+        NOT_ASSESSABLE = "not_assessable", "Cannot be assessed"
+
+    class Incisor(models.TextChoices):
+        CLASS_I = "class_i", "Class I"
+        CLASS_II_1 = "class_ii_div1", "Class II division 1"
+        CLASS_II_2 = "class_ii_div2", "Class II division 2"
+        CLASS_III = "class_iii", "Class III"
+        NOT_ASSESSABLE = "not_assessable", "Cannot be assessed"
+
+    class Severity(models.TextChoices):
+        NONE = "none", "None"
+        MILD = "mild", "Mild"
+        MODERATE = "moderate", "Moderate"
+        SEVERE = "severe", "Severe"
+
+    class Skeletal(models.TextChoices):
+        CLASS_I = "class_i", "Class I"
+        CLASS_II = "class_ii", "Class II"
+        CLASS_III = "class_iii", "Class III"
+        NOT_ASSESSED = "not_assessed", "Not assessed"
+
+    class Profile(models.TextChoices):
+        STRAIGHT = "straight", "Straight"
+        CONVEX = "convex", "Convex"
+        CONCAVE = "concave", "Concave"
+        NOT_ASSESSED = "not_assessed", "Not assessed"
+
+    class Hygiene(models.TextChoices):
+        GOOD = "good", "Good"
+        FAIR = "fair", "Fair"
+        POOR = "poor", "Poor"
+
+    TEXT_FIELDS = ("midline_upper", "midline_lower", "crossbite", "other_findings", "habits", "tmj",
+                   "problem_list", "objectives", "treatment_options", "extractions_planned", "notes")
+    CHOICE_FIELDS = {"molar_right": Angle, "molar_left": Angle, "canine_right": Angle, "canine_left": Angle,
+                     "incisor_relationship": Incisor, "crowding_upper": Severity, "crowding_lower": Severity,
+                     "spacing_upper": Severity, "spacing_lower": Severity, "skeletal_pattern": Skeletal,
+                     "facial_profile": Profile, "oral_hygiene": Hygiene}
+
+    patient = models.ForeignKey(Patient, on_delete=models.PROTECT, related_name="ortho_assessments")
+    encounter = models.OneToOneField(DentalEncounter, on_delete=models.PROTECT, related_name="ortho_assessment")
+    recorded_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    molar_right = models.CharField(max_length=16, choices=Angle.choices, blank=True)
+    molar_left = models.CharField(max_length=16, choices=Angle.choices, blank=True)
+    canine_right = models.CharField(max_length=16, choices=Angle.choices, blank=True)
+    canine_left = models.CharField(max_length=16, choices=Angle.choices, blank=True)
+    incisor_relationship = models.CharField(max_length=16, choices=Incisor.choices, blank=True)
+    # Millimetres; a negative overbite is an open bite, a negative overjet a reverse overjet.
+    overjet_mm = models.DecimalField(max_digits=3, decimal_places=1, null=True, blank=True)
+    overbite_mm = models.DecimalField(max_digits=3, decimal_places=1, null=True, blank=True)
+    crowding_upper = models.CharField(max_length=10, choices=Severity.choices, blank=True)
+    crowding_lower = models.CharField(max_length=10, choices=Severity.choices, blank=True)
+    spacing_upper = models.CharField(max_length=10, choices=Severity.choices, blank=True)
+    spacing_lower = models.CharField(max_length=10, choices=Severity.choices, blank=True)
+    midline_upper = models.CharField(max_length=80, blank=True)
+    midline_lower = models.CharField(max_length=80, blank=True)
+    crossbite = models.CharField(max_length=255, blank=True)
+    other_findings = models.TextField(blank=True)  # impacted, missing, rotated teeth...
+    skeletal_pattern = models.CharField(max_length=14, choices=Skeletal.choices, blank=True)
+    facial_profile = models.CharField(max_length=14, choices=Profile.choices, blank=True)
+    habits = models.CharField(max_length=255, blank=True)
+    tmj = models.CharField(max_length=255, blank=True)
+    oral_hygiene = models.CharField(max_length=6, choices=Hygiene.choices, blank=True)
+    problem_list = models.TextField(blank=True)
+    objectives = models.TextField(blank=True)
+    treatment_options = models.TextField(blank=True)
+    extractions_planned = models.CharField(max_length=120, blank=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        db_table = "dental_ortho_assessment"
+        ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(condition=Q(overjet_mm__isnull=True) | Q(overjet_mm__gte=-20, overjet_mm__lte=20),
+                                   name="ortho_overjet_range"),
+            models.CheckConstraint(condition=Q(overbite_mm__isnull=True) | Q(overbite_mm__gte=-20, overbite_mm__lte=20),
+                                   name="ortho_overbite_range"),
+        ]
+
+
+class OrthoCase(Versioned, TimestampedModel):
+    """A course of orthodontic treatment, from planning through active treatment and retention."""
+
+    class Status(models.TextChoices):
+        PLANNED = "planned", "Planned"
+        ACTIVE = "active", "Active treatment"
+        RETENTION = "retention", "Retention"
+        COMPLETED = "completed", "Completed"
+        DISCONTINUED = "discontinued", "Discontinued"
+
+    class Appliance(models.TextChoices):
+        FIXED_METAL = "fixed_metal", "Fixed braces, metal brackets"
+        FIXED_CERAMIC = "fixed_ceramic", "Fixed braces, ceramic brackets"
+        SELF_LIGATING = "self_ligating", "Fixed braces, self-ligating brackets"
+        ALIGNERS = "aligners", "Clear aligners"
+        REMOVABLE = "removable", "Removable appliance"
+        FUNCTIONAL = "functional", "Functional appliance"
+        OTHER = "other", "Other appliance"
+
+    class Arches(models.TextChoices):
+        BOTH = "both", "Upper and lower"
+        UPPER = "upper", "Upper only"
+        LOWER = "lower", "Lower only"
+
+    class Billing(models.TextChoices):
+        PACKAGE = "package", "Package price, paid in instalments"
+        PER_VISIT = "per_visit", "Charged per visit"
+
+    class Retainer(models.TextChoices):
+        NONE = "none", "None"
+        BONDED = "bonded", "Bonded (fixed) retainer"
+        HAWLEY = "hawley", "Removable Hawley retainer"
+        CLEAR = "clear", "Removable clear retainer"
+        OTHER = "other", "Other retainer"
+
+    OPEN = (Status.PLANNED, Status.ACTIVE, Status.RETENTION)
+    EDITABLE = ("orthodontist_id", "appliance", "arches", "objectives", "expected_months", "retainer_upper",
+                "retainer_lower", "retention_review_months", "notes")
+
+    number = models.CharField(max_length=20, unique=True)
+    patient = models.ForeignKey(Patient, on_delete=models.PROTECT, related_name="ortho_cases")
+    assessment = models.ForeignKey(OrthoAssessment, null=True, blank=True, on_delete=models.PROTECT,
+                                   related_name="cases")
+    plan = models.ForeignKey(TreatmentPlan, null=True, blank=True, on_delete=models.PROTECT, related_name="ortho_cases")
+    orthodontist = models.ForeignKey(User, on_delete=models.PROTECT, related_name="ortho_cases")
+    appliance = models.CharField(max_length=16, choices=Appliance.choices)
+    arches = models.CharField(max_length=6, choices=Arches.choices, default=Arches.BOTH)
+    objectives = models.TextField(blank=True)
+    notes = models.TextField(blank=True)
+    expected_months = models.PositiveSmallIntegerField(null=True, blank=True)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.PLANNED)
+    started_on = models.DateField(null=True, blank=True)
+    debonded_on = models.DateField(null=True, blank=True)
+    closed_on = models.DateField(null=True, blank=True)
+    closed_reason = models.CharField(max_length=255, blank=True)
+    retainer_upper = models.CharField(max_length=8, choices=Retainer.choices, blank=True)
+    retainer_lower = models.CharField(max_length=8, choices=Retainer.choices, blank=True)
+    retention_review_months = models.PositiveSmallIntegerField(null=True, blank=True)
+    billing_mode = models.CharField(max_length=10, choices=Billing.choices)
+    package_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    deposit = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    per_visit_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+
+    class Meta:
+        db_table = "dental_ortho_case"
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["patient"], condition=Q(status__in=["planned", "active", "retention"]),
+                                    name="ortho_one_open_case_per_patient"),
+            models.CheckConstraint(condition=(Q(billing_mode="package", package_price__isnull=False,
+                                                package_price__gte=0, deposit__gte=0,
+                                                deposit__lte=models.F("package_price"))
+                                              | Q(billing_mode="per_visit", per_visit_price__isnull=False,
+                                                  per_visit_price__gte=0)),
+                                   name="ortho_case_billing_consistent"),
+            models.CheckConstraint(condition=Q(expected_months__isnull=True)
+                                   | Q(expected_months__gte=1, expected_months__lte=96),
+                                   name="ortho_case_expected_months"),
+            models.CheckConstraint(condition=~Q(status__in=["completed", "discontinued"]) | Q(closed_on__isnull=False),
+                                   name="ortho_case_closed_has_date"),
+        ]
+
+
+class OrthoVisit(UUIDModel):
+    """What was done at one orthodontic appointment: wires, elastics, aligner number, breakages, hygiene."""
+
+    class Kind(models.TextChoices):
+        RECORDS = "records", "Records (photos, X-rays, models)"
+        BONDING = "bonding", "Braces or appliance fitted"
+        ADJUSTMENT = "adjustment", "Adjustment"
+        ALIGNER = "aligner", "Aligner check or change"
+        EMERGENCY = "emergency", "Emergency (breakage, discomfort)"
+        DEBOND = "debond", "Braces removed"
+        RETAINER_FIT = "retainer_fit", "Retainer fitted"
+        RETENTION_REVIEW = "retention_review", "Retention review"
+        OTHER = "other", "Other"
+
+    class Status(models.TextChoices):
+        RECORDED = "recorded", "Recorded"
+        ENTERED_IN_ERROR = "entered_in_error", "Entered in error"
+
+    case = models.ForeignKey(OrthoCase, on_delete=models.PROTECT, related_name="visits")
+    visit = models.ForeignKey(Visit, on_delete=models.PROTECT, related_name="ortho_visits")
+    encounter = models.ForeignKey(DentalEncounter, null=True, blank=True, on_delete=models.PROTECT,
+                                  related_name="ortho_visits")
+    kind = models.CharField(max_length=16, choices=Kind.choices)
+    upper_wire = models.CharField(max_length=60, blank=True)
+    lower_wire = models.CharField(max_length=60, blank=True)
+    elastics = models.CharField(max_length=120, blank=True)
+    aligner_number = models.PositiveSmallIntegerField(null=True, blank=True)
+    breakages = models.CharField(max_length=255, blank=True)
+    oral_hygiene = models.CharField(max_length=6, choices=OrthoAssessment.Hygiene.choices, blank=True)
+    compliance = models.CharField(max_length=6, choices=OrthoAssessment.Hygiene.choices, blank=True)
+    notes = models.TextField(blank=True)
+    next_interval_weeks = models.PositiveSmallIntegerField(null=True, blank=True)
+    performed_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+    # Per-visit billing: the case's per-visit price at the time, or null when this visit is not charged.
+    charge = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    no_charge_reason = models.CharField(max_length=255, blank=True)
+    # Either billing mode: an additional charge, e.g. a lost retainer or broken appliance.
+    extra_charge = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    extra_charge_reason = models.CharField(max_length=120, blank=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.RECORDED)
+    voided_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    voided_at = models.DateTimeField(null=True, blank=True)
+    void_reason = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        db_table = "dental_ortho_visit"
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["case", "-created_at"], name="dental_ortho_visit_case_idx")]
+        constraints = [
+            models.CheckConstraint(condition=Q(charge__isnull=True) | Q(charge__gte=0), name="ortho_visit_charge"),
+            models.CheckConstraint(condition=Q(extra_charge=0) | (Q(extra_charge__gt=0) & ~Q(extra_charge_reason="")),
+                                   name="ortho_visit_extra_has_reason"),
+            models.CheckConstraint(condition=Q(status="recorded")
+                                   | (Q(status="entered_in_error", voided_at__isnull=False) & ~Q(void_reason="")),
+                                   name="ortho_visit_void_consistent"),
+            models.CheckConstraint(condition=Q(next_interval_weeks__isnull=True)
+                                   | Q(next_interval_weeks__gte=1, next_interval_weeks__lte=52),
+                                   name="ortho_visit_interval"),
+        ]
+
+
+class OrthoInstalment(TimestampedModel):
+    """One scheduled payment of a package. Billing state comes from the invoice line that charged it."""
+
+    class Status(models.TextChoices):
+        SCHEDULED = "scheduled", "Scheduled"
+        CANCELLED = "cancelled", "Cancelled"
+
+    case = models.ForeignKey(OrthoCase, on_delete=models.PROTECT, related_name="instalments")
+    sequence = models.PositiveSmallIntegerField()
+    label = models.CharField(max_length=60)
+    due_date = models.DateField()
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.SCHEDULED)
+    cancelled_reason = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        db_table = "dental_ortho_instalment"
+        ordering = ["case", "sequence"]
+        indexes = [models.Index(fields=["status", "due_date"], name="dental_ortho_inst_due_idx")]
+        constraints = [
+            models.UniqueConstraint(fields=["case", "sequence"], name="ortho_instalment_sequence_unique"),
+            models.CheckConstraint(condition=Q(amount__gt=0), name="ortho_instalment_amount_positive"),
+            models.CheckConstraint(condition=Q(status="scheduled") | ~Q(cancelled_reason=""),
+                                   name="ortho_instalment_cancel_reason"),
+        ]
+
+
+class OrthoCaseEvent(models.Model):
+    """Status changes and price revisions of a case, with who and why."""
+
+    id = models.BigAutoField(primary_key=True)
+    case = models.ForeignKey(OrthoCase, on_delete=models.PROTECT, related_name="events")
+    action = models.CharField(max_length=30)
+    note = models.CharField(max_length=255, blank=True)
+    actor = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "dental_ortho_case_event"
+        ordering = ["created_at", "id"]

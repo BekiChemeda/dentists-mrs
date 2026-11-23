@@ -110,17 +110,23 @@ There is no DICOM support. Uploads are ordinary image files.
 | `dental/lab-cases/<id>/` | GET / POST `dental.labcase.manage`, `dental.labcase.work` | |
 | `dental/lab-cases/<id>/move/`, `…/assign/` | POST `dental.labcase.manage`, `dental.labcase.work` | Status: requested → in progress → ready for fitting → delivered, or cancelled |
 
+## Orthodontics
+
+See [orthodontics.md](orthodontics.md#api): assessment per examination, cases, visits, status changes, price
+changes, instalments brought forward.
+
 ## Dental additions to shared endpoints
 
 - `visits/`: each visit carries `dental_encounters` (id, dentist, status), so the waiting list can open the right
   workspace.
 - `appointment-types/` and `rooms/` (chairs): appointment type sets the default length and chair; booking refuses
   a second appointment on the same chair at the same time.
-- `billing/invoices/<id>/pull-charges/`: pulls signed dental procedure records from the visit, each one once.
+- `billing/invoices/<id>/pull-charges/`: also pulls orthodontic per-visit and extra charges, and package instalments
+  due by the invoice date (on an invoice without a visit, only those instalments). It pulls signed dental procedure records from the visit, each one once.
   Plan estimates are never billed.
 - `inventory/items/` (read): also open to `dental.procedure.record` and `dental.catalog.manage`, so staff can pick
   materials.
 - `reports/`: dental reports (`dental_plans`, `dental_pending_items`, `dental_procedures`,
   `dental_procedure_categories`, `dental_follow_ups`, `dental_imaging`, `dental_diagnoses`,
-  `dental_revenue_procedure`, `dental_revenue_dentist`, `dental_materials`, `dental_estimates`, `dental_chairs`)
+  `dental_revenue_procedure`, `dental_revenue_dentist`, `dental_materials`, `dental_estimates`, `dental_chairs`, `dental_ortho_cases`, `dental_ortho_instalments`)
   with the usual date filters and audited CSV export.

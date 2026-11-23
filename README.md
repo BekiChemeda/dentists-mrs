@@ -19,9 +19,10 @@ It is built on the Clinic MRS foundation (`BekiChemeda/mrs`): the same patients,
 | Procedures | Configurable catalogue and prices; procedure records linked to plan item, tooth, performer and assistant; multi-session work; materials taken from stock at signing; never billed twice, never billed when not performed |
 | Prescriptions | From the medicine catalogue; printed for an outside pharmacy when the clinic has none; no suggested doses |
 | Images | Radiographs and photographs on the clinic server only, checked by content, served only after a permission check, every view audited; included in backup and restore. No DICOM |
+| Orthodontics | Orthodontic assessment, treatment course from fitting to retention, wires and elastics at each visit, progress photos; charged as a package with deposit and instalments, or per visit |
 | Recalls and laboratory | Follow-up and recall worklist with contact log; dental laboratory cases for crowns, bridges and dentures |
 | Billing and stock | Invoices from signed procedures, cash and the existing payment methods, discounts, voids and refunds with two-person approval; dental item categories, pack sizes, batches and expiry |
-| Management | Dental, operational and financial reports with audited CSV export; switchable modules (periodontal chart, imaging, dental laboratory, recalls) |
+| Management | Dental, operational and financial reports with audited CSV export; switchable modules (periodontal chart, imaging, dental laboratory, recalls, orthodontics) |
 | Security | Individual accounts, editable roles (dentist, dental assistant, hygienist, technician, imaging staff and the clinic roles) enforced by the API, lockout, session limits, two-step sign-in, append-only hash-chained audit trail |
 
 The medical modules of Clinic MRS (triage, laboratory, the doctor's consultation, pharmacy) are still present; a new dental installation switches triage, laboratory and pharmacy off, and the system administrator can switch them back on.
@@ -80,7 +81,7 @@ On Ubuntu Server 24.04, from the application folder: `sudo deploy/install.sh` (g
 
 ## Documentation
 
-- Dental: [requirements matrix](docs/dental/requirements.md) · [architecture](docs/dental/architecture.md) · [data model](docs/dental/data-model.md) · [API](docs/dental/api.md) · [clinical workflows](docs/dental/clinical-workflows.md) · [dental chart](docs/dental/odontogram.md) · [periodontal chart](docs/dental/periodontal-chart.md) · [permissions](docs/dental/permissions.md) · [testing](docs/dental/testing.md) · [clinical review log](docs/dental/clinical-review-log.md)
+- Dental: [requirements matrix](docs/dental/requirements.md) · [architecture](docs/dental/architecture.md) · [data model](docs/dental/data-model.md) · [API](docs/dental/api.md) · [clinical workflows](docs/dental/clinical-workflows.md) · [orthodontics](docs/dental/orthodontics.md) · [dental chart](docs/dental/odontogram.md) · [periodontal chart](docs/dental/periodontal-chart.md) · [permissions](docs/dental/permissions.md) · [testing](docs/dental/testing.md) · [clinical review log](docs/dental/clinical-review-log.md)
 - [Architecture of the shared platform](docs/architecture.md)
 - [Architecture decision records](docs/adr/)
 - [Manuals for each role](docs/manuals/README.md) (dentist, dental assistant, dental receptionist, dental clinic administrator, and the shared receptionist, cashier, accountant, administrator, troubleshooting and maintenance manuals)

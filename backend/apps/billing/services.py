@@ -167,7 +167,28 @@ def unbilled_charges(visit) -> list[dict]:
             charges.append({"kind": InvoiceLine.Kind.PROCEDURE, "description": f"{rec.procedure.name}{where}{session}"[:200],
                             "quantity": Decimal(1), "unit_price": rec.price, "source_type": "dental_procedure",
                             "source_id": str(rec.pk), "tax_rate": rec.tax_rate})
+    from apps.core.modules import is_enabled
+
+    if is_enabled("orthodontics"):
+        from apps.dental.services.ortho import due_instalment_charges, visit_charges
+
+        # Orthodontic visit charges (per-visit cases, extra charges) and the patient's package instalments
+        # that have fallen due by the visit date.
+        for charge in visit_charges(visit) + due_instalment_charges(visit.patient_id, visit.visit_date):
+            if (charge["source_type"], charge["source_id"]) not in billed:
+                charges.append(charge)
     return charges
+
+
+def unbilled_patient_charges(patient_id) -> list[dict]:
+    """Charges that belong to the patient rather than to a visit: orthodontic instalments due by today."""
+    from apps.core.modules import is_enabled
+
+    if not is_enabled("orthodontics"):
+        return []
+    from apps.dental.services.ortho import due_instalment_charges
+
+    return due_instalment_charges(patient_id, timezone.localdate())
 
 
 @transaction.atomic
@@ -175,10 +196,15 @@ def add_pending_charges(ctx: ActorContext, invoice: Invoice) -> int:
     """Pull the visit's unbilled charges (see unbilled_charges for the policy) onto a draft invoice."""
     invoice = _lock(invoice)
     _require_draft(invoice)
-    if not invoice.visit_id:
-        raise ConflictError("Link the invoice to a visit to collect its charges.")
+    if invoice.visit_id:
+        pending = unbilled_charges(invoice.visit)
+    else:
+        pending = unbilled_patient_charges(invoice.patient_id)
+        if not pending:
+            raise ConflictError("Link the invoice to a visit to collect its charges. Without a visit, only "
+                                "orthodontic instalments that are due can be collected.")
     added = 0
-    for charge in unbilled_charges(invoice.visit):
+    for charge in pending:
         _add_line(invoice, **charge)
         added += 1
     _recalculate(invoice)

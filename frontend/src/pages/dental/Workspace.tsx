@@ -19,12 +19,14 @@ import { FREQUENCIES } from "../../labels";
 import { ChartView } from "./ChartView";
 import { DentalStatus, NOTE_GROUPS, NOTE_LABEL, useDentalCatalog } from "./common";
 import { ImagesPanel } from "./Images";
+import { OrthoAssessmentForm, OrthoPanel } from "./Ortho";
 import { PerioChart } from "./Perio";
 import { PlanList, LocationInputs, locationBody } from "./Plans";
 import { AmendReason, EncounterProcedures } from "./Procedures";
 import type { DentalEncounter, DentalSummary, DiagnosisTerm, RiskReview } from "./types";
 
-type Tab = "history" | "exam" | "chart" | "perio" | "diagnoses" | "plan" | "procedures" | "rx" | "images" | "sign";
+type Tab =
+  "history" | "exam" | "chart" | "perio" | "diagnoses" | "plan" | "procedures" | "rx" | "images" | "ortho" | "sign";
 
 export function DentalWorkspace() {
   const { id = "" } = useParams();
@@ -60,6 +62,7 @@ export function DentalWorkspace() {
     ...(moduleOn("dental_imaging") && can("dental.imaging.view")
       ? [{ key: "images" as const, label: t("dental.tab_images", "Images") }]
       : []),
+    ...(moduleOn("orthodontics") ? [{ key: "ortho" as const, label: t("dental.tab_ortho", "Orthodontics") }] : []),
     { key: "sign", label: e.status === "draft" ? t("dental.tab_sign", "Sign") : t("dental.tab_summary", "Summary") },
   ];
   return (
@@ -120,6 +123,15 @@ export function DentalWorkspace() {
       {tab === "procedures" && <EncounterProcedures encounter={e} />}
       {tab === "rx" && <PrescriptionsTab encounter={e} writable={writable && can("prescriptions.create")} />}
       {tab === "images" && <ImagesPanel patientId={e.patient.id} encounterId={e.id} />}
+      {tab === "ortho" && (
+        <div className="stack">
+          <OrthoAssessmentForm
+            encounterId={e.id}
+            editable={e.status === "draft" && e.dentist.id === user?.id && can("dental.ortho.manage")}
+          />
+          <OrthoPanel patientId={e.patient.id} encounterId={e.status === "draft" ? e.id : undefined} />
+        </div>
+      )}
       {tab === "sign" && <SignTab encounter={e} writable={writable} unsaved={examDirty} />}
     </div>
   );

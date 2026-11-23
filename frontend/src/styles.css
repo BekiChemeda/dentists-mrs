@@ -1037,12 +1037,11 @@ dl.facts dd {
 
 .tabs {
   display: flex;
+  flex-wrap: wrap; /* every tab stays visible; a hidden "Sign" tab is easy to miss */
   gap: 4px;
   padding: 4px;
   background: var(--track);
   border-radius: 12px;
-  overflow-x: auto;
-  scrollbar-width: thin;
   width: fit-content;
   max-width: 100%;
 }
@@ -3703,4 +3702,14 @@ body.print-body .print-only {
 }
 .plain-list li {
   padding: 3px 0;
+}
+fieldset.form-group {
+  margin: 0;
+  padding: 14px 16px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+fieldset.form-group > legend {
+  padding: 0 6px;
+  font-weight: 700;
 }

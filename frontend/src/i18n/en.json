@@ -34,7 +34,8 @@
     "dental_encounters": "My dental examinations",
     "recalls": "Recalls",
     "lab_cases": "Dental laboratory",
-    "dental_catalogue": "Dental catalogue"
+    "dental_catalogue": "Dental catalogue",
+    "ortho": "Orthodontics"
   },
   "auth": {
     "sign_in": "Sign in",

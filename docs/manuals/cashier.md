@@ -24,6 +24,16 @@ Your menu: **Dashboard**, **Patients**, **Appointments**, **Billing**, **Approva
 Laboratory tests are charged at the point the clinic chose (when requested, collected or verified),
 so patients are not charged for tests that were never done.
 
+**Dental clinics.** Signed dental procedures on the visit are added the same way, each once. For orthodontic
+patients:
+
+- **Package (instalments).** Instalments that are due by today are added automatically, labelled with the case
+  number, e.g. *Orthodontic treatment OC-2026-00012: Instalment 3 of 12*. A patient can pay an instalment with no
+  visit: choose **No visit** and click **Add visit charges**. To take an instalment early, the dentist (or you,
+  from the dental record if you can see it) uses **Take payment today**; it is then added like a due one.
+- **Per visit.** Each orthodontic visit appears as *Orthodontic visit OC-…: Adjustment*, plus any extra charge
+  the dentist recorded (e.g. a lost retainer).
+
 ## 2. Take payment
 
 On the invoice click **Take payment**.

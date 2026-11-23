@@ -48,6 +48,7 @@ const DentalEncountersPage = lazyPage(() => import("./pages/dental/Pages"), "Den
 const RecallsPage = lazyPage(() => import("./pages/dental/Pages"), "RecallsPage");
 const LabCasesPage = lazyPage(() => import("./pages/dental/Pages"), "LabCasesPage");
 const DentalCataloguePage = lazyPage(() => import("./pages/dental/Pages"), "DentalCataloguePage");
+const OrthoCasesPage = lazyPage(() => import("./pages/dental/Ortho"), "OrthoCasesPage");
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -322,6 +323,14 @@ function App() {
           element={
             <Guarded nav="recalls">
               <RecallsPage />
+            </Guarded>
+          }
+        />
+        <Route
+          path="/dental/ortho"
+          element={
+            <Guarded nav="ortho">
+              <OrthoCasesPage />
             </Guarded>
           }
         />

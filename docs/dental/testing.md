@@ -57,6 +57,10 @@ Demo accounts (password `Demo-Clinic-2026`): `reception`, `dentist`, `dentist2`,
 | 17 Server restart during work | — | `deploy/scripts/test-resilience.py` (medical data) |
 | 18 Backup and restore with images | — | `test-backup-restore.sh` |
 
+Orthodontics: `test_orthodontic_package_with_instalments` (assessment, case with deposit and 9 instalments,
+braces fitted, deposit invoiced and paid, an instalment taken early) and `test_orthodontic_case_charged_per_visit`
+(fitting not charged with a reason, adjustment on the invoice). Backend: `apps/dental/tests/test_orthodontics.py`.
+
 Scenario 1 also checks two data-loss cases found while testing:
 
 - Text typed on *Complaint & examination* survives a visit to another tab, and signing is blocked while it is

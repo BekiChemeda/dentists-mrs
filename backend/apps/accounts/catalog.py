@@ -76,6 +76,8 @@ PERMISSIONS: dict[str, tuple[str, str]] = {
     "dental.labcase.work": ("dental", "Work on dental laboratory cases assigned to you"),
     "dental.catalog.manage": ("dental", "Maintain dental procedures and prices, findings, diagnoses and appointment types"),
     "dental.recall.manage": ("dental", "Manage follow-ups and recalls"),
+    "dental.ortho.manage": ("dental", "Record orthodontic assessments and visits, and manage orthodontic cases and "
+                                      "their package or per-visit prices"),
 }
 
 ROLES: dict[str, tuple[str, str, list[str]]] = {
@@ -169,7 +171,7 @@ ROLES: dict[str, tuple[str, str, list[str]]] = {
          "appointments.manage", "queue.manage", "dental.view", "dental.write", "dental.chart.record", "dental.amend",
          "dental.plan.manage", "dental.procedure.record", "dental.procedure.sign", "prescriptions.create",
          "dental.imaging.view", "dental.imaging.upload", "dental.imaging.manage", "dental.labcase.manage",
-         "dental.recall.manage", "pharmacy.view", "reports.operational", "reports.clinical"],
+         "dental.recall.manage", "dental.ortho.manage", "pharmacy.view", "reports.operational", "reports.clinical"],
     ),
     "dental_assistant": (
         "Dental assistant",
@@ -255,6 +257,9 @@ ROLE_CHANGES_0014 = {
     "receptionist": {"add": ["dental.recall.manage"]},
     "clinic_admin": {"add": ["dental.catalog.manage"]},
 }
+
+# Added in migration 0015 (orthodontics): dentists manage orthodontic cases.
+ROLE_CHANGES_0015 = {"dentist": {"add": ["dental.ortho.manage"]}}
 
 ROLE_CHANGES_0010 = {
     "clinic_admin": {"add": ["patients.status"], "remove": []},

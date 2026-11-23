@@ -21,6 +21,7 @@ Permission codes are defined in `backend/apps/accounts/catalog.py` and enforced 
 | `dental.labcase.work` | Work on laboratory cases assigned to oneself (name and MRN only) |
 | `dental.catalog.manage` | Maintain dental procedures and prices, finding types, diagnosis terms, appointment types |
 | `dental.recall.manage` | Recall list: book, postpone, log contact attempts |
+| `dental.ortho.manage` | Orthodontics: record assessments and visits, start and close cases, set and change the package or per-visit price |
 
 Reused, not duplicated: `prescriptions.create` (prescribing), `reports.clinical` / `reports.operational` /
 `reports.financial` (dental reports), `billing.*`, `inventory.*`, `appointments.*`, `queue.manage`,
@@ -45,6 +46,7 @@ Reused, not duplicated: `prescriptions.create` (prescribing), `reports.clinical`
 | dental.labcase.work | | | | ✓ | | | |
 | dental.catalog.manage | | | | | | | ✓ |
 | dental.recall.manage | ✓ | | ✓ | | | ✓ | |
+| dental.ortho.manage | ✓ | | | | | | |
 | patients.view | ✓ | ✓ | ✓ | | ✓ | ✓ | ✓ |
 | queue.manage | ✓ | ✓ | ✓ | | | ✓ | ✓ |
 | appointments.view | ✓ | ✓ | ✓ | | ✓ | ✓ | ✓ |
@@ -52,7 +54,8 @@ Reused, not duplicated: `prescriptions.create` (prescribing), `reports.clinical`
 | reports.clinical | ✓ | | | | | | ✓ |
 
 The clinic director, cashier, accountant, inventory manager and system administrator roles are unchanged and get
-no dental clinical permissions. A small clinic gives one person several roles.
+no dental clinical permissions. The cashier collects orthodontic instalments through ordinary invoices and may bring an
+instalment forward (`billing.invoice`); they do not see the orthodontic record. A small clinic gives one person several roles.
 
 A hygienist works within the clinic's approved scope. By default they can chart, record and sign their own
 procedures (for example scaling) but cannot start or sign an examination or make a diagnosis; a clinic that

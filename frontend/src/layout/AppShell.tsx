@@ -41,6 +41,7 @@ import {
   Smile,
   BellRing,
   Hammer,
+  Sparkles,
 } from "lucide-react";
 import { api, queryString } from "../api/client";
 import { useAction, useGet } from "../api/hooks";
@@ -78,6 +79,7 @@ const ICONS: Record<string, typeof Users> = {
   phones: Smartphone,
   dental_encounters: Smile,
   recalls: BellRing,
+  ortho: Sparkles,
   lab_cases: Hammer,
   dental_catalogue: Tags,
 };

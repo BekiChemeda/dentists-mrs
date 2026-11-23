@@ -182,6 +182,55 @@ def chair_use(df, dt):
              "no_shows": r["no_shows"]} for r in rows]
 
 
+
+def ortho_cases(df=None, dt=None):
+    """Open orthodontic cases: how long in treatment, when last seen, when the next visit is due."""
+    from .models import OrthoCase, OrthoVisit
+
+    today = timezone.localdate()
+    next_due = {r.patient_id: r.due_date for r in Recall.objects.filter(kind=Recall.Kind.ORTHO_ADJUSTMENT,
+                                                                        status__in=Recall.OPEN).order_by("-due_date")}
+    rows = []
+    for case in (OrthoCase.objects.filter(status__in=OrthoCase.OPEN).select_related("patient", "orthodontist")
+                 .order_by("patient__last_name")):
+        last = (OrthoVisit.objects.filter(case=case, status="recorded").select_related("visit")
+                .order_by("-created_at").first())
+        months = None
+        if case.started_on:
+            months = (today.year - case.started_on.year) * 12 + today.month - case.started_on.month
+        rows.append({"case": case.number, "patient": case.patient.full_name, "mrn": case.patient.mrn,
+                     "phone": case.patient.phone, "status": case.get_status_display(),
+                     "appliance": case.get_appliance_display(), "orthodontist": case.orthodontist.full_name,
+                     "started": case.started_on, "months": months, "expected": case.expected_months,
+                     "last_visit": last.visit.visit_date if last else None,
+                     "next_due": next_due.get(case.patient_id), "billing": case.get_billing_mode_display()})
+    return rows
+
+
+def ortho_instalments(df, dt):
+    """Package instalments due in the period, and earlier ones still not invoiced, with their invoice state."""
+    from .models import OrthoInstalment
+    from .services.ortho import instalment_lines, instalment_state
+
+    today = timezone.localdate()
+    qs = (OrthoInstalment.objects.filter(status="scheduled").filter(Q(due_date__range=(df, dt)) | Q(due_date__lt=df))
+          .select_related("case__patient").order_by("due_date", "case__number", "sequence"))
+    items = list(qs[:5000])
+    lines = instalment_lines(items)
+    labels = {"scheduled": "Scheduled", "due": "Due today", "overdue": "Overdue, not invoiced",
+              "invoiced": "Invoiced, unpaid", "part_paid": "Part paid", "paid": "Paid"}
+    rows = []
+    for inst in items:
+        line = lines.get(str(inst.pk))
+        state = instalment_state(inst, line, today)
+        if inst.due_date < df and state == "paid":
+            continue  # earlier instalments are listed only while something is still owed
+        rows.append({"due": inst.due_date, "case": inst.case.number, "patient": inst.case.patient.full_name,
+                     "mrn": inst.case.patient.mrn, "phone": inst.case.patient.phone, "instalment": inst.label,
+                     "amount": inst.amount, "state": labels.get(state, state),
+                     "invoice": line.invoice.number if line else ""})
+    return rows
+
 def _c(*spec):
     return tuple(Column(*s) for s in spec)
 
@@ -235,4 +284,16 @@ DENTAL_REPORTS = [
     Report("dental_chairs", "Chair use", "Booked appointments and hours per chair or room.", "reports.operational",
            _c(("chair", "Chair"), ("appointments", "Appointments", "number"), ("booked_hours", "Booked hours", "number"),
               ("no_shows", "No-shows", "number")), chair_use),
+    Report("dental_ortho_cases", "Orthodontic patients", "Open orthodontic cases: months in treatment, last visit "
+           "and next visit due.", "reports.clinical",
+           _c(("case", "Case"), ("patient", "Patient"), ("mrn", "MRN"), ("phone", "Phone"), ("status", "Status"),
+              ("appliance", "Appliance"), ("orthodontist", "Dentist"), ("started", "Started", "date"),
+              ("months", "Months in treatment", "number"), ("expected", "Expected months", "number"),
+              ("last_visit", "Last visit", "date"), ("next_due", "Next visit due", "date"),
+              ("billing", "Charged")), ortho_cases, uses_dates=False),
+    Report("dental_ortho_instalments", "Orthodontic instalments", "Package instalments due in the period, and "
+           "earlier ones not yet invoiced or paid.", "reports.financial",
+           _c(("due", "Due", "date"), ("case", "Case"), ("patient", "Patient"), ("mrn", "MRN"), ("phone", "Phone"),
+              ("instalment", "Instalment"), ("amount", "Amount (ETB)", "money"), ("state", "State"),
+              ("invoice", "Invoice")), ortho_instalments),
 ]

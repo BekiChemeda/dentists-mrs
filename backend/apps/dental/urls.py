@@ -1,5 +1,6 @@
 from django.urls import path, re_path
 
+from .api import ortho_views as ov
 from .api import views as v
 
 UUID = r"[0-9a-f-]{36}"
@@ -67,4 +68,14 @@ urlpatterns = [
     path("dental/lab-cases/", v.LabCaseListView.as_view()),
     path("dental/lab-cases/<uuid:pk>/", v.LabCaseDetailView.as_view()),
     re_path(rf"^dental/lab-cases/(?P<pk>{UUID})/(?P<action>move|assign)/$", v.LabCaseDetailView.as_view()),
+    # Orthodontics
+    path("dental/encounters/<uuid:pk>/ortho-assessment/", ov.EncounterOrthoAssessmentView.as_view()),
+    path("dental/patients/<uuid:patient_id>/ortho/", ov.PatientOrthoView.as_view()),
+    path("dental/patients/<uuid:patient_id>/ortho/cases/", ov.PatientOrthoCasesView.as_view()),
+    path("dental/ortho/cases/", ov.OrthoCaseListView.as_view()),
+    path("dental/ortho/cases/<uuid:pk>/", ov.OrthoCaseDetailView.as_view()),
+    re_path(rf"^dental/ortho/cases/(?P<pk>{UUID})/(?P<action>visits|billing|start|retention|complete|discontinue)/$",
+            ov.OrthoCaseDetailView.as_view()),
+    path("dental/ortho/visits/<uuid:pk>/void/", ov.OrthoVisitVoidView.as_view()),
+    path("dental/ortho/instalments/<uuid:pk>/bring-forward/", ov.OrthoInstalmentForwardView.as_view()),
 ]

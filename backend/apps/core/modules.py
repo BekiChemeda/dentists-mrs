@@ -77,6 +77,11 @@ MODULES: dict[str, Module] = {m.key: m for m in [
     Module("recalls", "Recalls and follow-ups", "The list of patients due for a review or preventive recall.",
            frozenset({"dental.recall.manage"}),
            when_off="No recall list. Dentists write the review date in the examination note."),
+    Module("orthodontics", "Orthodontics",
+           "Orthodontic assessments, treatment courses (braces, aligners, retainers), visit records, and package "
+           "prices paid in instalments or charges per visit.",
+           frozenset({"dental.ortho.manage"}),
+           when_off="No orthodontic assessments, cases or instalments. Earlier records stay in patient records."),
 ]}
 
 # People who see patients: medical doctors and dentists. Used for doctor lists, queue access and alerts.
@@ -160,6 +165,16 @@ def open_work(key: str) -> list[str]:
         n = DentalLabCase.objects.filter(status__in=DentalLabCase.OPEN).count()
         if n:
             found.append(f"{n} laboratory case(s) not yet delivered or cancelled")
+    elif key == "orthodontics":
+        from apps.dental.models import OrthoCase, OrthoInstalment
+        from apps.dental.services.ortho import unbilled_instalments
+
+        n = OrthoCase.objects.filter(status__in=OrthoCase.OPEN).count()
+        if n:
+            found.append(f"{n} orthodontic case(s) still open (planned, active or in retention)")
+        m = unbilled_instalments(OrthoInstalment.objects.all()).count()
+        if m:
+            found.append(f"{m} orthodontic instalment(s) not yet invoiced")
     elif key == "recalls":
         from apps.dental.models import Recall
 
@@ -256,6 +271,7 @@ AREAS: list[tuple[str, str, str | None, dict[str, str]]] = [
     ("dental_lab", "Dental laboratory cases", "dental_lab", {"dental.labcase.manage": "create",
                                                              "dental.labcase.work": "work"}),
     ("recalls", "Recalls", "recalls", {"dental.recall.manage": "work"}),
+    ("orthodontics", "Orthodontics", "orthodontics", {"dental.ortho.manage": "work"}),
     ("clinic", "Clinic administration", None, {"audit.operational": "view", "staff.manage": "admin",
                                                "departments.manage": "admin", "announcements.manage": "admin",
                                                "settings.manage": "admin", "branding.manage": "admin",

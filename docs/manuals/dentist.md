@@ -4,7 +4,7 @@ You examine patients, record the dental chart and the periodontal chart, make di
 and sign procedures, prescribe, and book reviews. Read [getting-started.md](getting-started.md) first.
 
 Your menu: **Dashboard**, **Patients**, **Waiting list**, **Appointments**, **Calendar**, **My dental
-examinations**, **Recalls**, **Dental laboratory**, **Reports**.
+examinations**, **Recalls**, **Orthodontics**, **Dental laboratory**, **Reports**.
 
 > The clinical lists in this version (chart findings, diagnoses, procedures, medical history questions) are
 > starter lists **pending clinical review**. Tell the clinic administrator what to change.
@@ -102,3 +102,30 @@ the audit log. A wrong image is **withdrawn** with a reason, never deleted. DICO
   attempts, postpone, or mark declined or unreachable.
 - *Dental laboratory*: send crowns, bridges and dentures to the laboratory (**Laboratory case…** on the dental
   record), follow their status and record delivery.
+
+## 9. Orthodontics
+
+**Assessment.** In the examination, open the **Orthodontics** tab: molar and canine relationship on each side,
+incisor relationship, overjet and overbite in millimetres (negative for a reverse overjet or an open bite),
+crowding and spacing per arch, midlines, crossbite, skeletal pattern, profile, habits, problem list, objectives
+and options discussed. **Save assessment**. It locks when you sign the examination.
+
+**Start a case.** **Start orthodontic case**: appliance, arches, expected length, objectives (taken from the
+assessment), and how the treatment is charged:
+
+- **Package, paid in instalments**: package price, deposit, number of instalments and how often. The preview shows
+  the schedule. The cashier collects each instalment when it is due; **Take payment today** lets a patient pay one
+  early. Visits are not charged.
+- **Charged per visit**: the price per visit. Each visit is charged unless you untick it and say why. Charge the
+  fitting, removal, records and retainers as procedures from the catalogue.
+
+**Each visit.** **Record orthodontic visit**: what was done (braces fitted, adjustment, aligner change, emergency,
+braces removed, retainer fitted, retention review…), upper and lower archwire, elastics, aligner number,
+breakages, hygiene, wear and cooperation, notes, an extra charge with its reason (e.g. a lost retainer), and
+**Next visit in (weeks)**, which puts the patient on the recall list. Fitting the braces starts the treatment;
+removing them or fitting the retainer moves the case to retention.
+
+**Later.** **Change price or payment** (with a reason) keeps what is already invoiced and replaces the rest of the
+schedule. **Complete case** at the end; **Discontinue…** with a reason cancels instalments not yet invoiced.
+The case page also compares progress photos from two dates (upload them on the **Images** tab).
+*Orthodontics* in the menu lists all patients in treatment or retention, with their last visit.

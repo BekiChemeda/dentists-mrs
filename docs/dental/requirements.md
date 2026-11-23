@@ -93,6 +93,19 @@ Tests: `backend/apps/dental/tests/` (API and service tests, PostgreSQL), `e2e/te
 | SMS or email reminders to patients | — | — | Not done: needs consent and legal review (spec §16) |
 | Dental laboratory cases (crowns, bridges, dentures) | `DentalLabCase` | `test_lab_case_flow_and_technician_scope` | Built |
 
+## Orthodontics (added after the specification; see [orthodontics.md](orthodontics.md))
+
+| Requirement | Where | Evidence | Status |
+| --- | --- | --- | --- |
+| Orthodontic assessment in the examination, locked on signing, version-checked | `OrthoAssessment` | `test_assessment_belongs_to_the_draft_examination`, e2e package scenario | Built, review pending (R-15) |
+| Treatment course: planned → active → retention → completed, or discontinued with reason; one open case per patient | `OrthoCase`, `services/ortho.py` | `test_debond_retention_and_completion`, `test_discontinue_cancels_instalments_not_yet_invoiced` | Built |
+| Visit record: wires, elastics, aligner number, breakages, hygiene, cooperation; next visit on the recall list | `OrthoVisit` | `test_per_visit_case_charges_each_visit_unless_reason`, e2e | Built, review pending (R-15) |
+| Package price with deposit and instalments; collected when due, once; brought forward on request | `OrthoInstalment`, billing pull-charges | `test_package_case_schedule_billing_and_no_double_billing`, `test_invoice_without_visit_collects_due_instalments`, e2e | Built, policy review pending (R-16) |
+| Per-visit charging, no-charge reason, extra charges | `OrthoVisit.charge`, `extra_charge` | `test_per_visit_case_charges_each_visit_unless_reason`, `test_void_visit_rules`, e2e | Built |
+| Price or charging change with reason, keeping what was invoiced | `change_billing` | `test_change_billing_keeps_what_was_invoiced` | Built |
+| Progress photos side by side | `Ortho.tsx` (uses dental images) | — | Built |
+| Module switch with open-work protection; permissions; audited reads; reports | `core/modules.py`, `dental.ortho.manage`, reports | `test_module_off_and_open_work`, `test_patient_ortho_view_is_audited_and_scoped`, `test_ortho_reports` | Built |
+
 ## Access control, audit, reports, documents (spec §3, §17–18, §22)
 
 | Requirement | Where | Evidence | Status |

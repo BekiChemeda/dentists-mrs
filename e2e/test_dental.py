@@ -227,3 +227,119 @@ def test_assistant_cannot_sign_an_examination(as_role, unique):
     )
     assert status == 403
     _no_js_errors(rc, dr, asst)
+
+
+# --------------------------------------------------------------------------------------------- orthodontics
+def _ortho_tab(page: Page):
+    _tab(page, "Orthodontics")
+    expect(page.locator("main")).to_contain_text("Orthodontic assessment")
+
+
+def _cashier_invoice(as_role, name: str):
+    cashier = as_role("cashier")
+    cashier.goto(f"{BASE}/billing")
+    cashier.click("text=New invoice")
+    cashier.fill("dialog[open] input[placeholder^='Find a patient']", name)
+    cashier.click("dialog[open] button.search-item")
+    cashier.select_option("#ni-v", index=1)
+    cashier.click("dialog[open] >> text=Create invoice")
+    cashier.wait_for_url(re.compile(r"/billing/invoices/"))
+    return cashier
+
+
+def test_orthodontic_package_with_instalments(as_role, unique):
+    """Braces paid as a package: assessment, case with deposit and instalments, braces fitted, deposit invoiced and
+    paid, the next instalment taken early."""
+    name = f"Bethel E2E Ortho{unique}"
+    rc = as_role("reception")
+    register_patient(rc, "Bethel", f"Ortho{unique}", birth="2011-05-02")
+    dr = as_role("dentist")
+    _start_exam(rc, dr, name)
+    _ortho_tab(dr)
+    dr.select_option("#oa-molar_right", "class_ii")
+    dr.select_option("#oa-molar_left", "class_ii")
+    dr.select_option("#oa-incisor_relationship", "class_ii_div1")
+    dr.fill("#oa-overjet_mm", "7")
+    dr.fill("#oa-overbite_mm", "5")
+    dr.select_option("#oa-crowding_upper", "moderate")
+    dr.fill("#oa-objectives", "Reduce overjet, relieve upper crowding")
+    dr.get_by_role("button", name="Save assessment").click()
+    expect(dr.locator("main")).to_contain_text("All changes saved")
+
+    dr.get_by_role("button", name="Start orthodontic case").click()
+    form = dr.locator("dialog[open]")
+    expect(form.locator("#f-objectives")).to_have_value("Reduce overjet, relieve upper crowding")
+    form.locator("#f-expected_months").fill("18")
+    form.locator("#f-package_price").fill("60000")
+    form.locator("#f-deposit").fill("15000")
+    form.locator("#f-instalment_count").fill("9")
+    expect(form).to_contain_text("9 × about 5,000.00 ETB every 30 days")
+    form.get_by_role("button", name="Create case").click()
+    expect(dr.locator("dialog[open]")).to_have_count(0)
+    panel = dr.locator("main")
+    expect(panel).to_contain_text("Planned")
+    expect(panel).to_contain_text("Deposit")
+    expect(panel).to_contain_text("Instalment 9 of 9")
+
+    dr.get_by_role("button", name="Record orthodontic visit").click()
+    visit = dr.locator("dialog[open]")
+    expect(visit.locator("#f-kind")).to_have_value("bonding")
+    visit.locator("#f-upper_wire").fill("0.014 NiTi")
+    visit.locator("#f-lower_wire").fill("0.014 NiTi")
+    expect(visit).to_contain_text("Covered by the package price")
+    visit.get_by_role("button", name="Record visit").click()
+    expect(dr.locator("dialog[open]")).to_have_count(0)
+    expect(panel).to_contain_text("Active treatment")
+    expect(panel).to_contain_text("0.014 NiTi / 0.014 NiTi")
+
+    # The cashier collects the deposit only (other instalments are not due yet), then takes payment.
+    cashier = _cashier_invoice(as_role, name)
+    lines = cashier.locator("main table").first
+    expect(lines).to_contain_text("Deposit")
+    expect(lines).not_to_contain_text("Instalment 1 of 9")
+    cashier.get_by_role("button", name="Issue invoice").click()
+    cashier.get_by_role("button", name="Take payment").click()
+    cashier.select_option("#p-m", "cash")
+    cashier.click("dialog[open] >> text=Record payment")
+    cashier.wait_for_selector("#receipt")
+
+    dr.reload()
+    _tab(dr, "Orthodontics")
+    row = dr.locator("tr", has_text="Deposit")
+    expect(row).to_contain_text("Paid")
+    # The patient pays the first instalment early.
+    dr.locator("tr", has_text="Instalment 1 of 9").get_by_role("button", name="Take payment today").click()
+    expect(dr.locator("tr", has_text="Instalment 1 of 9")).to_contain_text("Due today")
+    _no_js_errors(rc, dr, cashier)
+
+
+def test_orthodontic_case_charged_per_visit(as_role, unique):
+    """Braces charged per visit: the adjustment is on the invoice, the fitting (a separate procedure) is not."""
+    name = f"Abel E2E PerVisit{unique}"
+    rc = as_role("reception")
+    register_patient(rc, "Abel", f"PerVisit{unique}", birth="2009-01-12")
+    dr = as_role("dentist")
+    _start_exam(rc, dr, name)
+    _ortho_tab(dr)
+    dr.get_by_role("button", name="Start orthodontic case").click()
+    form = dr.locator("dialog[open]")
+    form.get_by_role("button", name="Charged per visit").click()
+    form.locator("#f-per_visit_price").fill("1200")
+    form.get_by_role("button", name="Create case").click()
+    expect(dr.locator("main")).to_contain_text("Price per visit")
+    for kind, charged in (("bonding", False), ("adjustment", True)):
+        dr.get_by_role("button", name="Record orthodontic visit").click()
+        visit = dr.locator("dialog[open]")
+        visit.locator("#f-kind").select_option(kind)
+        expect(visit.get_by_label(re.compile("Charge this visit"))).to_be_checked(checked=charged)
+        if not charged:
+            visit.locator("#f-no_charge_reason").fill("Fitting charged as a procedure")
+        visit.get_by_role("button", name="Record visit").click()
+        expect(dr.locator("dialog[open]")).to_have_count(0)
+    expect(dr.locator("main")).to_contain_text("Charged on visits so far")
+    cashier = _cashier_invoice(as_role, name)
+    lines = cashier.locator("main table").first
+    expect(lines).to_contain_text("Orthodontic visit")
+    expect(lines).to_contain_text("Adjustment")
+    expect(lines).not_to_contain_text("Braces or appliance fitted")
+    _no_js_errors(rc, dr, cashier)
