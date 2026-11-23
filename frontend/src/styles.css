@@ -3415,3 +3415,292 @@ table.data.compact td {
     animation-duration: 3s;
   }
 }
+
+/* ---------------------------------------------------------------------------------------------------------
+   Dental: chart (odontogram), periodontal chart, images.
+   Meaning is carried by symbols, hatching and text; colour is only a second cue (prints in grayscale).
+   --------------------------------------------------------------------------------------------------------- */
+.print-only {
+  display: none;
+}
+body.print-body .print-only {
+  display: block;
+}
+.chart-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 1180px) {
+  .chart-layout {
+    grid-template-columns: 1fr;
+  }
+}
+.doc-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.odontogram {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.odontogram-sides {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+.odontogram-row {
+  display: flex;
+  gap: 2px;
+  width: max-content;
+  margin: 0 auto; /* centred, but still scrollable to both ends on a narrow screen */
+}
+.odontogram-row.arch-gap {
+  padding-bottom: 10px;
+  margin-bottom: 6px;
+  border-bottom: 1px dashed var(--line-strong);
+}
+/* Midline between the patient's right and left quadrants. */
+.odontogram-row > .tooth:nth-child(8):nth-last-child(9),
+.odontogram-row > .tooth:nth-child(5):nth-last-child(6) {
+  margin-right: 8px;
+}
+.tooth {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 42px;
+  min-height: 74px; /* tablet-sized touch target */
+  padding: 4px 2px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.tooth:hover {
+  background: var(--hover);
+  border-color: var(--line-strong);
+}
+.tooth:focus-visible {
+  outline: 3px solid var(--brand);
+  outline-offset: 1px;
+}
+.tooth.selected {
+  border-color: var(--brand);
+  background: var(--brand-tint);
+  box-shadow: 0 0 0 1px var(--brand);
+}
+.tooth-num {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.tooth-svg {
+  display: block;
+  color: var(--ink-2);
+}
+.tooth-surface {
+  stroke: var(--ink-3);
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+.tooth-surface:not(.has-condition):not(.has-existing) {
+  fill: var(--surface);
+}
+.tooth-surface.has-condition,
+.tooth-surface.has-existing {
+  stroke: var(--ink);
+}
+.tooth-surface.has-condition:not([style]) {
+  color: var(--danger);
+}
+.tooth-surface.has-existing:not([style]) {
+  color: var(--info-ink);
+}
+.tooth-missing {
+  stroke: var(--ink);
+  stroke-width: 3;
+  stroke-linecap: round;
+  fill: none;
+}
+.tooth-symbols {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1px;
+  min-height: 14px;
+  max-width: 44px;
+}
+.sym {
+  display: inline-block;
+  min-width: 14px;
+  padding: 0 3px;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 13px;
+  text-align: center;
+}
+.sym-condition {
+  color: var(--danger-ink);
+  background: var(--danger-tint);
+}
+.sym-existing {
+  color: var(--info-ink);
+  background: var(--info-tint);
+  border-style: dashed;
+}
+.sym-state {
+  color: var(--ink);
+  background: var(--track);
+}
+.chart-legend-dental ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.chart-legend-dental li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--ink);
+  border-radius: 3px;
+}
+.legend-swatch.solid {
+  background: var(--ink-2);
+}
+.legend-swatch.hatch {
+  background: repeating-linear-gradient(45deg, var(--ink-2) 0 2px, transparent 2px 5px);
+}
+.tooth-panel {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--subtle);
+}
+.surface-toggle {
+  min-width: 40px;
+  min-height: 40px;
+  font-weight: 700;
+}
+.surface-toggle[aria-pressed="true"] {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
+/* Periodontal chart: one row per tooth, three sites per side. */
+.perio-table td,
+.perio-table th {
+  padding: 6px 6px;
+  vertical-align: top;
+}
+.perio-site {
+  min-width: 74px;
+  text-align: center;
+}
+.perio-site.bop {
+  box-shadow: inset 0 -3px 0 var(--danger);
+}
+.perio-input {
+  width: 34px;
+  min-height: 34px;
+  padding: 2px 4px;
+  margin: 1px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.perio-input:disabled {
+  background: var(--track);
+}
+.perio-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0 3px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* Images */
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+}
+.image-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.image-card:hover {
+  border-color: var(--brand);
+}
+.image-card img {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #111;
+}
+.image-withdrawn {
+  font-weight: 700;
+  color: var(--danger-ink);
+}
+.image-viewer {
+  max-height: 70vh;
+  overflow: auto;
+  background: #111;
+  border-radius: 10px;
+}
+.image-viewer img {
+  display: block;
+  max-width: 100%;
+}
+
+@media print {
+  .tooth {
+    border-color: #999;
+    min-height: 0;
+  }
+  .tooth.selected {
+    background: none;
+    box-shadow: none;
+  }
+}
+.plain-list {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.plain-list li {
+  padding: 3px 0;
+}

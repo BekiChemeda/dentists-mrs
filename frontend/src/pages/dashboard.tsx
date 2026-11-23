@@ -44,7 +44,11 @@ export function DashboardPage() {
       node: <ClinicTrendsBlock />,
     },
     { key: "critical", show: can("clinical.write"), node: <CriticalBlock /> },
-    { key: "queue", show: can("queue.manage", "triage.record", "clinical.write"), node: <QueueBlock /> },
+    {
+      key: "queue",
+      show: can("queue.manage", "triage.record", "clinical.write", "dental.write"),
+      node: <QueueBlock />,
+    },
     { key: "appointments", show: can("appointments.view") && kind !== "doctor", node: <AppointmentsBlock /> },
     { key: "lab", show: can("lab.result.enter"), node: <LabBlock /> },
     { key: "pharmacy", show: can("pharmacy.dispense"), node: <PharmacyBlock /> },
@@ -138,8 +142,9 @@ function CriticalBlock() {
 
 function QueueBlock() {
   const { t } = useTranslation();
-  const { user, can } = useAuth();
-  const doctorOnly = can("clinical.write") && !can("queue.manage");
+  const { user, can, moduleOn } = useAuth();
+  const doctorOnly = can("clinical.write", "dental.write") && !can("queue.manage");
+  const doctorHome = can("clinical.write") ? "/consultations" : "/dental/encounters";
   const q = useGet<Visit[]>(
     ["visits", "dash", doctorOnly],
     `/visits/${doctorOnly && user ? `?doctor=${user.id}` : ""}`,
@@ -153,16 +158,18 @@ function QueueBlock() {
     <Panel
       title={doctorOnly ? t("dash.my_queue", "Your patients today") : t("dash.clinic_today", "The clinic today")}
       actions={
-        <Link className="btn btn-sm" to={doctorOnly ? "/consultations" : "/queue"}>
+        <Link className="btn btn-sm" to={doctorOnly ? doctorHome : "/queue"}>
           {t("dash.open_queue", "Open waiting list")}
         </Link>
       }
     >
       <div className="figures">
-        <div className={`figure${count("waiting_triage") ? " attention" : ""}`}>
-          <b>{count("waiting_triage")}</b>
-          <span>{t("queue.lane_triage", "Waiting for triage")}</span>
-        </div>
+        {moduleOn("triage") && (
+          <div className={`figure${count("waiting_triage") ? " attention" : ""}`}>
+            <b>{count("waiting_triage")}</b>
+            <span>{t("queue.lane_triage", "Waiting for triage")}</span>
+          </div>
+        )}
         <div className={`figure${count("waiting_doctor") ? " attention" : ""}`}>
           <b>{count("waiting_doctor")}</b>
           <span>{t("queue.lane_doctor", "Waiting for doctors")}</span>

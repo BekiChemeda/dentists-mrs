@@ -380,6 +380,7 @@ export interface Visit {
   } | null;
   diagnoses: { code: string; description: string }[];
   encounters: { id: string; doctor_id: string; status: "draft" | "signed" }[];
+  dental_encounters?: { id: string; dentist_id: string; status: "draft" | "signed" }[];
   /** Department code where the patient is now (set at triage, changed by an internal referral). */
   department?: string;
   internal_referral?: {
@@ -698,7 +699,9 @@ export interface StockItem {
   name: string;
   generic_name: string;
   brand_name: string;
-  category: "medicine" | "supply" | "consumable" | "reagent";
+  category: string;
+  pack_unit?: string;
+  units_per_pack?: string | null;
   dosage_form: string;
   strength: string;
   unit: string;

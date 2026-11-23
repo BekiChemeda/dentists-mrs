@@ -1,7 +1,7 @@
 {
   "app": {
-    "name": "Clinic MRS",
-    "tagline": "Medical Records System",
+    "name": "Dental MRS",
+    "tagline": "Dental Records System",
     "search_patients": "Find a patient by name, phone or MRN"
   },
   "nav": {
@@ -30,7 +30,11 @@
     "system": "System",
     "departments": "Departments",
     "announcements": "Announcements",
-    "phones": "Phones"
+    "phones": "Phones",
+    "dental_encounters": "My dental examinations",
+    "recalls": "Recalls",
+    "lab_cases": "Dental laboratory",
+    "dental_catalogue": "Dental catalogue"
   },
   "auth": {
     "sign_in": "Sign in",
@@ -168,5 +172,37 @@
     "outcome_denied": "Denied",
     "system": "system",
     "empty": "No events match these filters."
+  },
+  "queue": {
+    "doctor": "Dentist",
+    "lane_doctor": "Waiting for dentists",
+    "first_available": "First available dentist",
+    "any_doctor": "Any dentist",
+    "reassign": "Assign dentist…",
+    "reassign_title": "Assign a dentist",
+    "send_doctor": "Send to dentist without triage",
+    "kind_consult": "See a dentist",
+    "lane_doctor_inline": "waiting for the dentist"
+  },
+  "appointments": {
+    "all_doctors": "All dentists",
+    "follow_up": "Follow-up booked by the dentist"
+  },
+  "cal": {
+    "all_doctors": "All dentists",
+    "leg_quiet": "Up to 4 per dentist",
+    "leg_busy": "5–8 per dentist",
+    "leg_full": "More than 8 per dentist"
+  },
+  "dash": {
+    "median_wait": "Median wait to see a dentist"
+  },
+  "chart": {
+    "doctor": "Clinician"
+  },
+  "rooms": {
+    "none": "No chairs or rooms yet. Add the chairs where dentists see patients.",
+    "title": "Chairs and rooms",
+    "sub": "Dental chairs and treatment rooms. Appointment types can name a default chair; two appointments cannot share a chair at the same time. Dentists choose the chair they work at today, and the waiting list tells the patient where to go."
   }
 }

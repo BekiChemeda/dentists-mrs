@@ -352,6 +352,11 @@ export function PatientChart() {
                 <CalendarPlus size={18} aria-hidden /> {t("appointments.book", "Book appointment")}
               </button>
             )}
+            {can("dental.view") && (
+              <Link className="btn" to={`/dental/patients/${p.id}`}>
+                {t("dental.dental_record", "Dental record")}
+              </Link>
+            )}
             <button
               className="btn btn-ghost btn-icon"
               onClick={() => setPrintingCard(true)}

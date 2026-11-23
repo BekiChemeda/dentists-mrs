@@ -66,14 +66,20 @@ export function QueuePage() {
   const triageLabel = useTriageLabel();
   const { can, user, moduleOn } = useAuth();
   const [params, setParams] = useSearchParams();
-  const [scope, setScope] = useState<"all" | "mine">(can("clinical.write") && !can("queue.manage") ? "mine" : "all");
+  // Dentists see patients like doctors do; their examination is the dental workspace.
+  const dentist = can("dental.write") && !can("clinical.write");
+  const clinician = can("clinical.write", "dental.write");
+  const [scope, setScope] = useState<"all" | "mine">(clinician && !can("queue.manage") ? "mine" : "all");
   // Today's visits, open and completed, so the last tab can show who has finished.
   const q = useGet<Visit[]>(
     ["visits", "today", scope],
     `/visits/${scope === "mine" && user ? `?doctor=${user.id}` : ""}`,
     { refetchInterval: 20_000 },
   );
-  const stale = useGet<Visit[]>(["visits", "stale"], can("queue.manage", "clinical.write") ? "/visits/?stale=1" : null);
+  const stale = useGet<Visit[]>(
+    ["visits", "stale"],
+    can("queue.manage", "clinical.write", "dental.write") ? "/visits/?stale=1" : null,
+  );
   const [walkIn, setWalkIn] = useState(false);
   const [walkPatient, setWalkPatient] = useState<PatientBrief | null>(null);
   const [vitalsFor, setVitalsFor] = useState<Visit | null>(null);
@@ -81,7 +87,7 @@ export function QueuePage() {
   const navigate = useNavigate();
 
   const triageOn = moduleOn("triage");
-  const defaultTab: QueueTab = !triageOn || (can("clinical.write") && !can("triage.record")) ? "doctor" : "triage";
+  const defaultTab: QueueTab = !triageOn || (clinician && !can("triage.record")) ? "doctor" : "triage";
   const asked = params.get("tab") as QueueTab | null;
   const tab = asked && !(asked === "triage" && !triageOn) ? asked : defaultTab;
 
@@ -113,9 +119,10 @@ export function QueuePage() {
     false,
   );
   const start = useAction(
-    (visitId: string) => api.post<Encounter>(`/visits/${visitId}/encounters/`),
+    (visitId: string) =>
+      api.post<Encounter>(dentist ? `/dental/visits/${visitId}/encounters/` : `/visits/${visitId}/encounters/`),
     [["visits"]],
-    (enc) => navigate(`/consultations/${enc.id}`),
+    (enc) => navigate(dentist ? `/dental/encounters/${enc.id}?tab=history` : `/consultations/${enc.id}`),
     false,
   );
 
@@ -125,9 +132,18 @@ export function QueuePage() {
   const myDept =
     user?.department && destinations.some((d) => d.code === user.department?.code) ? user.department.code : "";
   const deptFilter = deptChoice ?? myDept;
-  const visits = (q.data ?? []).filter(
-    (v) => !deptFilter || v.status === "waiting_triage" || (v.department || v.triage?.triage_to) === deptFilter,
-  );
+  // A patient not yet sent to any department (no triage, as in most dental clinics) is everyone's, and a
+  // patient booked with this clinician always shows on their list.
+  const visits = (q.data ?? []).filter((v) => {
+    const sentTo = v.department || v.triage?.triage_to;
+    return (
+      !deptFilter ||
+      v.status === "waiting_triage" ||
+      !sentTo ||
+      sentTo === deptFilter ||
+      v.assigned_doctor?.id === user?.id
+    );
+  });
   const byTab: Record<QueueTab, Visit[]> = {
     triage: visits.filter((v) => v.status === "waiting_triage"),
     doctor: visits.filter((v) => v.status === "waiting_doctor"),
@@ -144,10 +160,14 @@ export function QueuePage() {
   ];
   const rows = byTab[tab];
   const callStage =
-    tab === "triage" && can("triage.record") ? "triage" : tab === "doctor" && can("clinical.write") ? "doctor" : null;
-  const canHandle = can("queue.manage", "triage.record", "clinical.write");
-  // The doctor's own consultation on this visit: the newest one they wrote.
-  const myEncounter = (v: Visit) => [...v.encounters].reverse().find((e) => e.doctor_id === user?.id);
+    tab === "triage" && can("triage.record") ? "triage" : tab === "doctor" && clinician ? "doctor" : null;
+  const canHandle = can("queue.manage", "triage.record", "clinical.write", "dental.write");
+  // The clinician's own consultation or dental examination on this visit: the newest one they wrote.
+  const myEncounter = (v: Visit) =>
+    dentist
+      ? [...(v.dental_encounters ?? [])].reverse().find((e) => e.dentist_id === user?.id)
+      : [...v.encounters].reverse().find((e) => e.doctor_id === user?.id);
+  const workspace = (id: string) => (dentist ? `/dental/encounters/${id}` : `/consultations/${id}`);
 
   const moreMenu = (v: Visit) => {
     const waiting = v.status === "waiting_triage" || v.status === "waiting_doctor";
@@ -185,7 +205,7 @@ export function QueuePage() {
         })),
       {
         label: t("consult.review", "Review consultation"),
-        hidden: v.status !== "after_consult" || !can("clinical.write"),
+        hidden: v.status !== "after_consult" || !clinician,
         onSelect: () => start.mutate(v.id),
       },
       { label: t("queue.open_chart", "Open patient chart"), onSelect: () => navigate(`/patients/${v.patient.id}`) },
@@ -211,14 +231,14 @@ export function QueuePage() {
         </button>
       );
     }
-    if ((v.status === "waiting_doctor" || v.status === "waiting_triage") && can("clinical.write") && mineOrFree) {
+    if ((v.status === "waiting_doctor" || v.status === "waiting_triage") && clinician && mineOrFree) {
       return (
         <button className="btn btn-sm btn-primary" disabled={start.isPending} onClick={() => start.mutate(v.id)}>
           <Stethoscope size={15} aria-hidden /> {t("queue.manage", "Manage")}
         </button>
       );
     }
-    if (v.status === "in_consultation" && can("clinical.write") && v.assigned_doctor?.id === user?.id) {
+    if (v.status === "in_consultation" && clinician && v.assigned_doctor?.id === user?.id) {
       return (
         <button className="btn btn-sm btn-primary" onClick={() => start.mutate(v.id)}>
           <Stethoscope size={15} aria-hidden /> {t("queue.manage", "Manage")}
@@ -234,7 +254,7 @@ export function QueuePage() {
     }
     if (v.status === "after_consult" && mine) {
       return (
-        <Link className="btn btn-sm btn-primary" to={`/consultations/${mine.id}`}>
+        <Link className="btn btn-sm btn-primary" to={workspace(mine.id)}>
           <Stethoscope size={15} aria-hidden /> {t("queue.manage", "Manage")}
         </Link>
       );

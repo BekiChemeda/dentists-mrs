@@ -280,11 +280,11 @@ function ActivateForm({ onDone }: { onDone: () => void }) {
         <div className="activation">
           <div
             className={`mfa-qr activation-qr${expired ? " expired" : ""}`}
-            aria-label={t("phones.qr_label", "Activation QR code for the Clinic MRS app")}
+            aria-label={t("phones.qr_label", "Activation QR code for the Dental MRS app")}
             dangerouslySetInnerHTML={{ __html: result.qr_svg }}
           />
           <ol className="steps-list">
-            <li>{t("phones.step1", "On the phone, open the Clinic MRS app.")}</li>
+            <li>{t("phones.step1", "On the phone, open the Dental MRS app.")}</li>
             <li>{t("phones.step2", "Tap Scan activation code and point the camera at this code.")}</li>
             <li>
               {t("phones.step3", "Cannot scan? Choose Enter the code, then type the address and the code:")}

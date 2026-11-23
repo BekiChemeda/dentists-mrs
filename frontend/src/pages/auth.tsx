@@ -73,7 +73,7 @@ export function LoginPage() {
               <p className="muted">
                 {t(
                   "auth.mfa_prompt",
-                  "Open your authenticator app and enter the 6-digit code for Clinic MRS. Lost your phone? Enter one of your recovery codes instead.",
+                  "Open your authenticator app and enter the 6-digit code for Dental MRS. Lost your phone? Enter one of your recovery codes instead.",
                 )}
               </p>
               <Field label={t("auth.mfa_code", "Code")} id="mfa-code">
@@ -279,7 +279,7 @@ function AuthBrand() {
             <Cross size={17} strokeWidth={3} />
           </span>
           <span>
-            clinic<span className="brand-muted">mrs</span>
+            dental<span className="brand-muted">mrs</span>
           </span>
         </>
       )}

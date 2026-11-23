@@ -269,7 +269,7 @@ export function EmailPanel() {
               label={t("email.site_url", "Address of this system (for links)")}
               id="em-site"
               error={err("site_url")}
-              hint={t("email.site_hint", "What staff type to open Clinic MRS, e.g. https://mrs.myclinic.local")}
+              hint={t("email.site_hint", "What staff type to open Dental MRS, e.g. https://mrs.myclinic.local")}
             >
               <input id="em-site" type="url" {...val("site_url")} />
             </Field>

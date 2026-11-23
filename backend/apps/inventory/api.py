@@ -96,7 +96,9 @@ class PurchaseSerializer(serializers.ModelSerializer):
                   "line_count", "created_at"]
 
 
-INVENTORY_READ = AnyOf(("inventory.view", "pharmacy.view", "prescriptions.create", "medicines.manage"))
+# Dental staff choose the materials a procedure used, so they may search the item list.
+INVENTORY_READ = AnyOf(("inventory.view", "pharmacy.view", "prescriptions.create", "medicines.manage",
+                        "dental.procedure.record", "dental.catalog.manage"))
 
 
 class ItemListCreateView(PermissionedView):

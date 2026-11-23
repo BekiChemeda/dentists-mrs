@@ -38,6 +38,9 @@ import {
   Network,
   ServerCog,
   Sun,
+  Smile,
+  BellRing,
+  Hammer,
 } from "lucide-react";
 import { api, queryString } from "../api/client";
 import { useAction, useGet } from "../api/hooks";
@@ -73,6 +76,10 @@ const ICONS: Record<string, typeof Users> = {
   departments: Network,
   announcements: Megaphone,
   phones: Smartphone,
+  dental_encounters: Smile,
+  recalls: BellRing,
+  lab_cases: Hammer,
+  dental_catalogue: Tags,
 };
 const GROUPS: NavGroup[] = ["work", "departments", "management", "admin"];
 
@@ -200,6 +207,7 @@ const DETAIL_LABELS: Record<string, [string, string]> = {
   patients: ["crumb.patient_chart", "Patient chart"],
   consultations: ["crumb.visit", "Visit"],
   billing: ["crumb.invoice", "Invoice"],
+  dental_encounters: ["crumb.examination", "Examination"],
 };
 
 /** "Clinic › Section › Detail": the section is a link back whenever you are on a detail page. */
@@ -304,7 +312,7 @@ function EmergencyStrip() {
         {waiting
           .map(
             (v) =>
-              `${v.patient.full_name} (${t("queue.ticket_n", "Ticket {{n}}", { n: v.queue_number })}, ${v.status === "waiting_triage" ? t("queue.lane_triage", "waiting for triage") : t("queue.lane_doctor", "waiting for doctor")})`,
+              `${v.patient.full_name} (${t("queue.ticket_n", "Ticket {{n}}", { n: v.queue_number })}, ${v.status === "waiting_triage" ? t("queue.lane_triage", "waiting for triage") : t("queue.lane_doctor_inline", "waiting for the dentist")})`,
           )
           .join("; ")}
       </span>
@@ -541,7 +549,7 @@ function Brand() {
         <Cross size={17} strokeWidth={3} />
       </span>
       <span>
-        clinic<span className="brand-muted">mrs</span>
+        dental<span className="brand-muted">mrs</span>
       </span>
     </Link>
   );

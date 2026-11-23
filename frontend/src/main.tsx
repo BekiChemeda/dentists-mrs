@@ -42,6 +42,12 @@ const AnnouncementsPage = lazyPage(() => import("./pages/announcements"), "Annou
 const PhonesPage = lazyPage(() => import("./pages/phones"), "PhonesPage");
 const DepartmentsPage = lazyPage(() => import("./pages/departments"), "DepartmentsPage");
 const SystemPage = lazyPage(() => import("./pages/system"), "SystemPage");
+const DentalWorkspace = lazyPage(() => import("./pages/dental/Workspace"), "DentalWorkspace");
+const DentalPatientPage = lazyPage(() => import("./pages/dental/Pages"), "DentalPatientPage");
+const DentalEncountersPage = lazyPage(() => import("./pages/dental/Pages"), "DentalEncountersPage");
+const RecallsPage = lazyPage(() => import("./pages/dental/Pages"), "RecallsPage");
+const LabCasesPage = lazyPage(() => import("./pages/dental/Pages"), "LabCasesPage");
+const DentalCataloguePage = lazyPage(() => import("./pages/dental/Pages"), "DentalCataloguePage");
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -284,6 +290,54 @@ function App() {
           element={
             <Guarded nav="phones">
               <PhonesPage />
+            </Guarded>
+          }
+        />
+        <Route
+          path="/dental/encounters"
+          element={
+            <Guarded nav="dental_encounters">
+              <DentalEncountersPage />
+            </Guarded>
+          }
+        />
+        <Route
+          path="/dental/encounters/:id"
+          element={
+            <RequirePermission anyOf={["dental.view"]}>
+              <DentalWorkspace />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/dental/patients/:id"
+          element={
+            <RequirePermission anyOf={["dental.view"]}>
+              <DentalPatientPage />
+            </RequirePermission>
+          }
+        />
+        <Route
+          path="/dental/recalls"
+          element={
+            <Guarded nav="recalls">
+              <RecallsPage />
+            </Guarded>
+          }
+        />
+        <Route
+          path="/dental/lab-cases"
+          element={
+            <Guarded nav="lab_cases">
+              <LabCasesPage />
+            </Guarded>
+          }
+        />
+        <Route
+          path="/dental/catalogue"
+          element={
+            <Guarded nav="dental_catalogue">
+              <DentalCataloguePage />
             </Guarded>
           }
         />

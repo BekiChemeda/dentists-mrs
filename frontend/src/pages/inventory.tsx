@@ -82,6 +82,14 @@ const CATEGORIES = [
   ["supply", "Medical supply"],
   ["consumable", "Consumable"],
   ["reagent", "Laboratory reagent"],
+  ["restorative", "Restorative material"],
+  ["anaesthetic", "Anaesthetic supply"],
+  ["endodontic", "Endodontic material"],
+  ["impression", "Impression material"],
+  ["prosthetic", "Prosthetic material"],
+  ["sterilisation", "Sterilisation supply"],
+  ["infection_control", "Infection-control supply"],
+  ["instrument", "Instrument or reusable equipment (never consumed)"],
 ];
 
 function StockList() {
@@ -370,6 +378,8 @@ export function ItemForm({ item, onDone }: { item?: StockItem; onDone: () => voi
           reorder_level: "0",
           selling_price: "0",
           is_active: true,
+          pack_unit: "",
+          units_per_pack: "",
         },
   );
   const suppliers = useGet<{ id: string; name: string; is_active: boolean }[]>(["suppliers"], "/inventory/suppliers/");
@@ -379,7 +389,7 @@ export function ItemForm({ item, onDone }: { item?: StockItem; onDone: () => voi
     void _o;
     void _u;
     void _l;
-    return { ...rest, default_supplier: f.default_supplier || null };
+    return { ...rest, default_supplier: f.default_supplier || null, units_per_pack: f.units_per_pack || null };
   };
   const save = useAction(
     () =>
@@ -430,6 +440,8 @@ export function ItemForm({ item, onDone }: { item?: StockItem; onDone: () => voi
         {input("unit", t("inventory.unit_label", "Counting unit (tablet, ml, vial…)"))}
         {input("reorder_level", t("inventory.reorder", "Reorder level"), "number")}
         {input("selling_price", t("inventory.price", "Selling price ETB per unit"), "number")}
+        {input("pack_unit", t("inventory.pack_unit", "Pack (box, syringe…), optional"))}
+        {input("units_per_pack", t("inventory.units_per_pack", "Units in one pack"), "number")}
         <Field label={t("inventory.supplier_default", "Usual supplier")} id="it-sup">
           <select
             id="it-sup"
