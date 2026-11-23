@@ -1,0 +1,13 @@
+[Unit]
+Description=Clinic MRS off-site backup (uploads only when switched on and due)
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/mrs
+ExecStart=/opt/mrs/deploy/scripts/offsite-backup.sh run
+# A failed upload (e.g. no internet) is retried at the next check; do not hammer the line.
+Nice=10
+IOSchedulingClass=idle

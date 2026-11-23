@@ -1,0 +1,9 @@
+[Unit]
+Description=Clinic MRS weekly restore test of the latest backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/mrs
+ExecStart=/opt/mrs/deploy/scripts/verify-backup.sh

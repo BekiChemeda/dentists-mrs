@@ -1,0 +1,9 @@
+[Unit]
+Description=Clinic MRS nightly database backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/mrs
+ExecStart=/opt/mrs/deploy/scripts/backup.sh daily

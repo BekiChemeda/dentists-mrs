@@ -1,0 +1,29 @@
+# Secrets and local data — never commit
+.env
+deploy/certs/*
+!deploy/certs/.gitkeep
+*.dump
+*.sql.gz
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+backend/staticfiles/
+
+# Node
+node_modules/
+frontend/dist/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+*.tsbuildinfo
+
+# Supplier signing keys and issued licences never go in the repository
+*.key
+*.licence
+vendor-tools/*.pem

@@ -1,0 +1,13 @@
+[Unit]
+Description=Clinic MRS daily jobs (reminders, unused-account review, health alerts, audit-log integrity check)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/mrs
+ExecStart=/usr/bin/docker compose exec -T api python manage.py send_daily_reminders
+ExecStart=/usr/bin/docker compose exec -T api python manage.py review_accounts
+ExecStart=/usr/bin/docker compose exec -T api python manage.py health_alerts
+# Prints an anchor (sequence:hash) into the system journal, outside the database.
+ExecStart=/usr/bin/docker compose exec -T api python manage.py verify_audit_chain

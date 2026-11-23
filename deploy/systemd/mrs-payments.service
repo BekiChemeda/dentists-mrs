@@ -1,0 +1,9 @@
+[Unit]
+Description=Clinic MRS: follow payments by phone (does nothing unless the licence includes them)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/mrs
+ExecStart=/usr/bin/docker compose exec -T api python manage.py check_online_payments

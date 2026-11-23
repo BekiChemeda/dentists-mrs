@@ -1,0 +1,10 @@
+[Unit]
+Description=Close finished Clinic MRS visits every 5 minutes (only if the clinic switched it on)
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

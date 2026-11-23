@@ -1,0 +1,25 @@
+name: Fetch Android attestation roots
+
+# Run by hand. Downloads Google's published hardware attestation root certificates so they can be
+# reviewed and committed to backend/apps/devices/attestation_roots.json (clinic servers may be offline).
+on: workflow_dispatch
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download roots
+        run: |
+          curl -sSf https://android.googleapis.com/attestation/root -o roots.json
+          python3 -c "import json; r=json.load(open('roots.json')); print(len(r), 'roots')"
+          git config user.name "Beknan Chemeda"
+          git config user.email "122085319+BekiChemeda@users.noreply.github.com"
+          git checkout --orphan attestation-roots
+          git rm -rq --cached .
+          git add roots.json
+          git commit -qm "Google attestation roots $(date -u +%F)"
+          git push -f origin attestation-roots

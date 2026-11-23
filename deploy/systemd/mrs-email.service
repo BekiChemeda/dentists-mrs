@@ -1,0 +1,9 @@
+[Unit]
+Description=Clinic MRS: send queued emails (does nothing while email is off)
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/mrs
+ExecStart=/usr/bin/docker compose exec -T api python manage.py send_email_outbox

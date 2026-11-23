@@ -1,0 +1,9 @@
+# Runtime dependencies. Keep this list short: every package is a long-term maintenance cost.
+Django>=5.2,<5.3            # LTS until April 2028
+djangorestframework>=3.18.2,<3.19
+psycopg[binary]>=3.2,<3.3   # PostgreSQL driver
+argon2-cffi>=23.1           # Argon2id password hashing
+gunicorn>=23,<28            # WSGI server
+cryptography>=44            # encrypts two-step sign-in secrets at rest
+segno>=1.6                  # QR code for authenticator enrolment (pure Python)
+Pillow>=13,<14               # re-encodes the uploaded clinic logo into a clean PNG

@@ -1,0 +1,37 @@
+from django.urls import path
+
+from . import app_auth, views
+
+urlpatterns = [
+    path("auth/login/", views.LoginView.as_view(), name="login"),
+    path("auth/app/login/", app_auth.AppLoginView.as_view(), name="app-login"),
+    path("auth/app/login/mfa/", app_auth.AppLoginMfaView.as_view(), name="app-login-mfa"),
+    path("auth/app/logout/", app_auth.AppLogoutView.as_view(), name="app-logout"),
+    path("auth/logout/", views.LogoutView.as_view(), name="logout"),
+    path("auth/login/mfa/", views.LoginMfaView.as_view(), name="login-mfa"),
+    path("auth/mfa/", views.MfaStatusView.as_view(), name="mfa-status"),
+    path("auth/mfa/setup/", views.MfaSetupView.as_view(), name="mfa-setup"),
+    path("auth/mfa/confirm/", views.MfaConfirmView.as_view(), name="mfa-confirm"),
+    path("auth/mfa/recovery-codes/", views.MfaRecoveryCodesView.as_view(), name="mfa-recovery-codes"),
+    path("auth/mfa/disable/", views.MfaDisableView.as_view(), name="mfa-disable"),
+    path("auth/me/email-alerts/", views.MyEmailAlertsView.as_view(), name="my-email-alerts"),
+    path("auth/me/room/", views.MyRoomView.as_view(), name="my-room"),
+    path("rooms/", views.RoomListCreateView.as_view(), name="room-list"),
+    path("rooms/<uuid:pk>/", views.RoomDetailView.as_view(), name="room-detail"),
+    path("auth/me/", views.MeView.as_view(), name="me"),
+    path("auth/password/change/", views.PasswordChangeView.as_view(), name="password-change"),
+    path("auth/sessions/", views.MySessionsView.as_view(), name="my-sessions"),
+    path("users/", views.UserListCreateView.as_view(), name="user-list"),
+    path("users/<uuid:pk>/", views.UserDetailView.as_view(), name="user-detail"),
+    path("users/<uuid:pk>/activate/", views.UserActivateView.as_view(), name="user-activate"),
+    path("users/<uuid:pk>/deactivate/", views.UserDeactivateView.as_view(), name="user-deactivate"),
+    path("users/<uuid:pk>/unlock/", views.UserUnlockView.as_view(), name="user-unlock"),
+    path("users/<uuid:pk>/reset-password/", views.UserResetPasswordView.as_view(), name="user-reset-password"),
+    path("users/<uuid:pk>/reset-mfa/", views.UserResetMfaView.as_view(), name="user-reset-mfa"),
+    path("users/<uuid:pk>/revoke-sessions/", views.UserRevokeSessionsView.as_view(), name="user-revoke-sessions"),
+    path("roles/", views.RoleListCreateView.as_view(), name="role-list"),
+    path("roles/<uuid:pk>/", views.RoleDetailView.as_view(), name="role-detail"),
+    path("departments/", views.DepartmentListCreateView.as_view(), name="department-list"),
+    path("departments/<uuid:pk>/", views.DepartmentDetailView.as_view(), name="department-detail"),
+    path("permissions/", views.PermissionListView.as_view(), name="permission-list"),
+]
