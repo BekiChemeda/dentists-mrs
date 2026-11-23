@@ -13,6 +13,16 @@ export function formatDateTime(iso: string | null | undefined, fallback = "—")
   }).format(new Date(iso));
 }
 
+/** A calendar date (YYYY-MM-DD, no time) as "7 Dec 2026". */
+export function formatDay(iso: string | null | undefined, fallback = "—"): string {
+  if (!iso) return fallback;
+  return new Date(`${iso.slice(0, 10)}T00:00:00`).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export function formatLongDate(date: Date): string {
   return new Intl.DateTimeFormat("en-GB", {
     timeZone: TZ,

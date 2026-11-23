@@ -465,7 +465,7 @@ export function ToothPanel({
         title={t("dental.remove_finding", "Remove this finding?")}
         body={t(
           "dental.remove_finding_body",
-          "Only for a slip in this examination. The removal is recorded in the audit log.",
+          "Use this only to correct a mistake made in this examination. The removal is saved in the record history with your name.",
         )}
         confirmLabel={t("common.remove", "Remove")}
         onClose={() => setRemoving(null)}

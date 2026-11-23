@@ -219,6 +219,17 @@ function Breadcrumb() {
   const match = [...NAV_ITEMS]
     .filter((i) => (i.path === "/" ? pathname === "/" : pathname.startsWith(i.path)))
     .sort((a, b) => b.path.length - a.path.length)[0];
+  if (!match && pathname.startsWith("/dental/patients/")) {
+    return (
+      <nav className="breadcrumb" aria-label={t("shell.breadcrumb", "Breadcrumb")}>
+        <span className="crumb-root">{t("app.name")}</span>
+        <ChevronRight size={14} aria-hidden />
+        <Link to="/patients">{t("nav.patients")}</Link>
+        <ChevronRight size={14} aria-hidden />
+        <strong aria-current="page">{t("crumb.dental_record", "Dental record")}</strong>
+      </nav>
+    );
+  }
   const section = match ? t(`nav.${match.key}`) : pathname.startsWith("/account") ? t("auth.change_password") : "";
   const deeper = match && match.path !== "/" && pathname.replace(/\/$/, "") !== match.path;
   const detail = deeper ? t(...(DETAIL_LABELS[match.key] ?? ["crumb.details", "Details"])) : null;

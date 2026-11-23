@@ -188,7 +188,7 @@ function ChartCompare({ patientId, encounters }: { patientId: string; encounters
         ))}
       </ul>
     ) : (
-      <p className="small muted">{t("dental.none", "None.")}</p>
+      <p className="small muted">{t("dental.no_findings_recorded", "No findings recorded.")}</p>
     );
   return (
     <details className="no-print" open={open} onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>

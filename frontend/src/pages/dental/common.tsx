@@ -41,6 +41,14 @@ const TONES: Record<string, BadgeTone> = {
   delivered: "ok",
   active: "ok",
   withdrawn: "muted",
+  historical: "muted",
+  resolved: "muted",
+  planned: "wait",
+  retention: "info",
+  discontinued: "muted",
+  entered_in_error: "muted",
+  recorded: "ok",
+  scheduled: "wait",
 };
 
 const LABELS: Record<string, string> = {
@@ -67,6 +75,14 @@ const LABELS: Record<string, string> = {
   delivered: "Delivered",
   active: "Active",
   withdrawn: "Withdrawn",
+  historical: "Historical",
+  resolved: "Resolved",
+  planned: "Planned",
+  retention: "Retention",
+  discontinued: "Discontinued",
+  entered_in_error: "Entered in error",
+  recorded: "Recorded",
+  scheduled: "Scheduled",
 };
 
 export function DentalStatus({ value }: { value: string }) {
@@ -151,6 +167,3 @@ export const PROCEDURE_TEXT_FIELDS: [string, string][] = [
   ["post_op_instructions", "Post-procedure instructions"],
   ["follow_up_recommendation", "Follow-up recommendation"],
 ];
-
-export const PENDING_REVIEW_NOTE =
-  "Starter list — pending clinical review. Names, symbols and prices must be checked by the clinic's dentists.";

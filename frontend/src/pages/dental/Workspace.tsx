@@ -14,7 +14,7 @@ import type { Paginated, StockItem } from "../../api/types";
 import { useAuth } from "../../auth/AuthContext";
 import { Banner, ErrorBanner, Field, Loading, Modal, PageHead, Panel, Tabs, printElement, toast } from "../../ui";
 import { formatDateTime } from "../../lib/format";
-import { ClinicHeader } from "../common";
+import { ClinicHeader, sexAge } from "../common";
 import { FREQUENCIES } from "../../labels";
 import { ChartView } from "./ChartView";
 import { DentalStatus, NOTE_GROUPS, NOTE_LABEL, useDentalCatalog } from "./common";
@@ -51,14 +51,14 @@ export function DentalWorkspace() {
     { key: "history", label: t("dental.tab_history", "History") },
     {
       key: "exam",
-      label: `${t("dental.tab_exam", "Complaint & examination")}${examDirty ? " •" : ""}`,
+      label: `${t("dental.tab_exam", "Examination")}${examDirty ? " •" : ""}`,
     },
-    { key: "chart", label: t("dental.tab_chart", "Chart"), count: e.findings.length },
+    { key: "chart", label: t("dental.tab_chart", "Chart"), count: e.findings.length || undefined },
     ...(moduleOn("periodontal") ? [{ key: "perio" as const, label: t("dental.tab_perio", "Periodontal") }] : []),
-    { key: "diagnoses", label: t("dental.tab_diagnoses", "Diagnoses"), count: e.diagnoses.length },
+    { key: "diagnoses", label: t("dental.tab_diagnoses", "Diagnoses"), count: e.diagnoses.length || undefined },
     { key: "plan", label: t("dental.tab_plan", "Treatment plan") },
-    { key: "procedures", label: t("dental.tab_procedures", "Procedures"), count: e.procedures.length },
-    { key: "rx", label: t("dental.tab_rx", "Prescriptions"), count: e.prescriptions.length },
+    { key: "procedures", label: t("dental.tab_procedures", "Procedures"), count: e.procedures.length || undefined },
+    { key: "rx", label: t("dental.tab_rx", "Prescriptions"), count: e.prescriptions.length || undefined },
     ...(moduleOn("dental_imaging") && can("dental.imaging.view")
       ? [{ key: "images" as const, label: t("dental.tab_images", "Images") }]
       : []),
@@ -71,8 +71,8 @@ export function DentalWorkspace() {
         title={`${t("dental.examination", "Dental examination")} · ${e.patient.full_name}`}
         sub={
           <span>
-            MRN {e.patient.mrn} · {e.patient.sex}, {e.patient.age} · Dr. {e.dentist.full_name} ·{" "}
-            {formatDateTime(e.created_at)} <DentalStatus value={e.status} />
+            MRN {e.patient.mrn} · {sexAge(e.patient, t)} · Dr. {e.dentist.full_name} · {formatDateTime(e.created_at)}{" "}
+            <DentalStatus value={e.status} />
             {e.amendments.length > 0 && (
               <span className="badge badge-info">
                 {t("dental.amended_n", "Amended ({{n}})", { n: e.amendments.length })}
@@ -91,7 +91,7 @@ export function DentalWorkspace() {
         <Banner tone="info">
           {t(
             "dental.not_mine",
-            "This examination is being written by Dr. {{who}}. You can record chart findings and procedures; only the author can edit the notes and sign.",
+            "This examination belongs to {{who}}. You can add chart findings and procedures; only {{who}} can edit the notes and sign.",
             {
               who: e.dentist.full_name,
             },
@@ -149,7 +149,7 @@ export function AlertStrip({ summary }: { summary?: DentalSummary }) {
     ? Object.entries(summary.risk_review.answers).filter(([, v]) => v.answer === "yes")
     : [];
   return (
-    <div className={`alert-strip${a.length || yes.length ? "" : " muted"}`} role="note">
+    <div className={`alert-strip${a.length || yes.length ? "" : " none"}`} role="note">
       <strong>{t("dental.alerts", "Alerts")}:</strong>{" "}
       {a.length
         ? a.map((x) => `${x.substance} (${x.severity})`).join(", ")
@@ -294,7 +294,10 @@ function HistoryTab({
           ) : (
             <Loading />
           )}
-          <p className="small muted">{t("dental.shared_hint", "Edit these in the patient's record (Patients).")}</p>
+          <p className="small muted">
+            {t("dental.shared_hint", "These are kept in the patient's main record.")}{" "}
+            <Link to={`/patients/${encounter.patient.id}`}>{t("dental.edit_there", "Edit them there")}</Link>
+          </p>
         </Panel>
         {summary && <ProfilePanel patientId={encounter.patient.id} profile={summary.profile} writable={writable} />}
       </div>
@@ -491,7 +494,29 @@ function ExamTab({
     <div className="stack">
       <ErrorBanner error={save.error} onReload={() => setDirty(false)} />
       {NOTE_GROUPS.map((g) => (
-        <Panel key={g.title} title={t(`dental.group_${g.title}`, g.title)}>
+        <Panel
+          key={g.title}
+          title={t(`dental.group_${g.title}`, g.title)}
+          actions={
+            writable && g.title.endsWith("oral examination") ? (
+              <button
+                type="button"
+                className="btn btn-sm"
+                title={t("dental.mark_normal_hint", "Writes “Normal” in every short field that is still empty")}
+                onClick={() => {
+                  setDirty(true);
+                  setF((cur) => {
+                    const next = { ...cur };
+                    for (const [k, , size] of g.fields) if (size === "short" && !next[k].trim()) next[k] = "Normal";
+                    return next;
+                  });
+                }}
+              >
+                {t("dental.mark_normal", "Mark the rest normal")}
+              </button>
+            ) : undefined
+          }
+        >
           {g.title === "Pain" && (
             <div className="form-grid">
               <Field label={t("dental.pain_present", "Pain present")} id="f-pain_present">
@@ -509,7 +534,11 @@ function ExamTab({
                   <option value="no">{t("common.no", "No")}</option>
                 </select>
               </Field>
-              <Field label={t("dental.pain_teeth", "Affected teeth (FDI)")} id="f-pain_teeth" error={save.error}>
+              <Field
+                label={t("dental.pain_teeth", "Affected teeth (e.g. 36, 37)")}
+                id="f-pain_teeth"
+                error={save.error}
+              >
                 <input
                   id="f-pain_teeth"
                   disabled={!writable}
@@ -567,7 +596,7 @@ function ExamTab({
                         }));
                       }}
                     />{" "}
-                    {s}
+                    {t(`dental.sens_${s}`, s.charAt(0).toUpperCase() + s.slice(1))}
                   </label>
                 ))}
               </fieldset>
@@ -590,26 +619,33 @@ function ExamTab({
               />
             </Field>
           )}
-          <div className={g.fields.every(([, , s]) => s === "short") ? "form-grid" : "stack-sm"}>
-            {g.fields.map(([k, label, size]) => (
-              <Field key={k} label={t(`dental.f_${k}`, label)} id={`f-${k}`} error={save.error}>
-                {writable ? (
-                  size === "short" ? (
-                    <input id={`f-${k}`} value={f[k]} onChange={(e) => set(k, e.target.value)} maxLength={255} />
-                  ) : (
-                    <textarea id={`f-${k}`} value={f[k]} onChange={(e) => set(k, e.target.value)} rows={3} />
-                  )
-                ) : (
-                  <div className="prewrap">
-                    {amendments(k).length
-                      ? amendments(k)[amendments(k).length - 1].amended_text
-                      : f[k] || <span className="subtle">—</span>}
-                    {amendments(k).length > 0 && <div className="small amended">{t("dental.amended", "Amended")}</div>}
-                  </div>
-                )}
-              </Field>
-            ))}
-          </div>
+          {[g.fields.filter(([, , s]) => s === "short"), g.fields.filter(([, , s]) => s !== "short")].map(
+            (fields, part) =>
+              fields.length > 0 && (
+                <div key={part} className={part === 0 ? "form-grid" : "stack-sm"}>
+                  {fields.map(([k, label, size]) => (
+                    <Field key={k} label={t(`dental.f_${k}`, label)} id={`f-${k}`} error={save.error}>
+                      {writable ? (
+                        size === "short" ? (
+                          <input id={`f-${k}`} value={f[k]} onChange={(e) => set(k, e.target.value)} maxLength={255} />
+                        ) : (
+                          <textarea id={`f-${k}`} value={f[k]} onChange={(e) => set(k, e.target.value)} rows={3} />
+                        )
+                      ) : (
+                        <div className="prewrap">
+                          {amendments(k).length
+                            ? amendments(k)[amendments(k).length - 1].amended_text
+                            : f[k] || <span className="subtle">—</span>}
+                          {amendments(k).length > 0 && (
+                            <div className="small amended">{t("dental.amended", "Amended")}</div>
+                          )}
+                        </div>
+                      )}
+                    </Field>
+                  ))}
+                </div>
+              ),
+          )}
         </Panel>
       ))}
       {writable && (
@@ -676,7 +712,8 @@ function DiagnosesTab({ encounter, writable }: { encounter: DentalEncounter; wri
                   </td>
                   <td className="mono">{d.location.label}</td>
                   <td>
-                    {d.certainty} · {d.status}
+                    {t(`dental.${d.certainty}`, d.certainty === "suspected" ? "Suspected" : "Confirmed")} ·{" "}
+                    <DentalStatus value={d.status} />
                   </td>
                   <td className="num">
                     {writable && (
@@ -690,9 +727,7 @@ function DiagnosesTab({ encounter, writable }: { encounter: DentalEncounter; wri
             </tbody>
           </table>
         )}
-        <p className="small subtle">
-          {t("dental.dx_codes", "Codes: WHO ICD-10 (starter list pending clinical review).")}
-        </p>
+        <p className="small subtle">{t("dental.dx_codes", "Diagnosis codes follow WHO ICD-10.")}</p>
       </Panel>
       {writable && (
         <Panel title={t("dental.add_dx", "Add a diagnosis")}>
@@ -1034,8 +1069,8 @@ function SignTab({
           <div id={printId} className="doc stack-sm">
             <ClinicHeader title={t("dental.exam_report", "Dental examination report")} />
             <p>
-              <strong>{encounter.patient.full_name}</strong> · MRN {encounter.patient.mrn} · {encounter.patient.sex},{" "}
-              {encounter.patient.age} · Dr. {encounter.dentist.full_name} · {t("dental.signed_at", "Signed")}{" "}
+              <strong>{encounter.patient.full_name}</strong> · MRN {encounter.patient.mrn} ·{" "}
+              {sexAge(encounter.patient, t)} · Dr. {encounter.dentist.full_name} · {t("dental.signed_at", "Signed")}{" "}
               {formatDateTime(encounter.signed_at)}
             </p>
             {NOTE_GROUPS.flatMap((g) => g.fields)
@@ -1063,7 +1098,11 @@ function SignTab({
                 <ul>
                   {encounter.diagnoses.map((d) => (
                     <li key={d.id}>
-                      {d.code} {d.term_text} — {d.location.label} ({d.certainty})
+                      {d.code} {d.term_text} — {d.location.label} (
+                      {d.certainty === "suspected"
+                        ? t("dental.suspected", "Suspected")
+                        : t("dental.confirmed", "Confirmed")}
+                      )
                     </li>
                   ))}
                 </ul>
@@ -1156,7 +1195,7 @@ function FollowUpPanel({ encounter }: { encounter: DentalEncounter }) {
           add.mutate();
         }}
       >
-        <Field label={t("dental.recall_kind", "Kind")} id="f-kind">
+        <Field label={t("dental.recall_type", "Type")} id="f-kind">
           <select id="f-kind" value={kind} onChange={(e) => setKind(e.target.value)}>
             {(catalog.data?.recall_kinds ?? []).map(([k, label]) => (
               <option key={k} value={k}>

@@ -86,7 +86,7 @@ export function AttachmentsPanel({ patientId }: { patientId: string }) {
             <thead>
               <tr>
                 <th>{t("att.document", "Document")}</th>
-                <th>{t("att.kind", "Kind")}</th>
+                <th>{t("att.kind", "Type")}</th>
                 <th>{t("att.added", "Added")}</th>
                 <th className="num">{t("att.size", "Size")}</th>
                 <th />
@@ -215,7 +215,7 @@ function AttachmentForm({ patientId, onDone }: { patientId: string; onDone: () =
         />
       </Field>
       <div className="form-grid">
-        <Field label={t("att.kind", "Kind")} id="at-k">
+        <Field label={t("att.kind", "Type")} id="at-k">
           <select id="at-k" value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })}>
             {KINDS.map((k) => (
               <option key={k.key} value={k.key}>

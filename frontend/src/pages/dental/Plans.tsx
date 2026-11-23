@@ -180,7 +180,7 @@ function LocationInputs({
         </select>
       </Field>
       {(scope === "tooth" || scope === "surfaces") && (
-        <Field label={t("dental.tooth_fdi", "Tooth (FDI)")} id="f-tooth">
+        <Field label={t("dental.tooth_fdi", "Tooth number")} id="f-tooth">
           <input
             id="f-tooth"
             inputMode="numeric"
@@ -632,7 +632,7 @@ export function PlanDetail({
                     <div className="row">
                       {["accepted", "in_progress"].includes(i.status) && (
                         <button className="btn btn-sm btn-ghost" onClick={() => setLinking(i)}>
-                          {t("dental.schedule", "Appointment…")}
+                          {t("dental.book_appointment", "Book appointment")}
                         </button>
                       )}
                       <button
@@ -642,7 +642,7 @@ export function PlanDetail({
                           setNewFee(i.estimated_fee);
                         }}
                       >
-                        {t("dental.revise_fee", "Fee…")}
+                        {t("dental.change_fee", "Change fee")}
                       </button>
                       {i.sessions_done === 0 && (
                         <button className="btn btn-sm btn-ghost" onClick={() => setCancelItem(i)}>

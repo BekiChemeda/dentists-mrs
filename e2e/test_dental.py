@@ -66,13 +66,13 @@ def test_toothache_to_filling_invoice_and_follow_up(as_role, unique):
     expect(dr.locator(".alert-strip")).to_contain_text("Medical history reviewed")
 
     # Complaint: type, look at the chart, come back: the text is still there and the tab shows unsaved work.
-    _tab(dr, "Complaint & examination")
+    _tab(dr, "Examination")
     dr.get_by_label("Chief complaint").fill("Pain in a lower left back tooth with sweets")
     _tab(dr, "Chart")
-    expect(dr.get_by_role("tab", name=re.compile("Complaint & examination •"))).to_be_visible()
+    expect(dr.get_by_role("tab", name=re.compile("Examination •"))).to_be_visible()
     _tab(dr, "Sign")
     expect(dr.locator("main")).to_contain_text("unsaved changes")
-    _tab(dr, "Complaint & examination")
+    _tab(dr, "Examination")
     expect(dr.get_by_label("Chief complaint")).to_have_value("Pain in a lower left back tooth with sweets")
     dr.locator(".action-bar").get_by_role("button", name="Save").click()
     expect(dr.locator(".action-bar")).to_contain_text("All changes saved")

@@ -185,6 +185,7 @@ class AmendmentSerializer(serializers.ModelSerializer):
 
 class EncounterListSerializer(serializers.ModelSerializer):
     dentist = UserBrief(read_only=True)
+    patient = PatientMini(read_only=True)
     diagnoses = serializers.SerializerMethodField()
 
     class Meta:

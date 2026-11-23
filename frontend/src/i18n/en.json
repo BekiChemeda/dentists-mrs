@@ -94,8 +94,13 @@
       "cashier": "Cashier",
       "inventory_manager": "Inventory",
       "accountant": "Accounts",
-      "general": "Workspace",
-      "clinic_director": "Clinic director"
+      "general": "Today",
+      "clinic_director": "Clinic director",
+      "dentist": "Dentist workspace",
+      "dental_hygienist": "Hygienist workspace",
+      "dental_assistant": "Chairside",
+      "dental_technician": "Dental laboratory",
+      "imaging_staff": "Dental imaging"
     },
     "focus": {
       "system_admin": "Server health, accounts, security and backups.",
@@ -109,7 +114,12 @@
       "inventory_manager": "Stock levels, reorder alerts and expiries will appear here.",
       "accountant": "Revenue, payments, refunds and outstanding balances.",
       "general": "Your available modules are listed below.",
-      "clinic_director": "Money, approvals, reports and clinic policy."
+      "clinic_director": "Money, approvals, reports and clinic policy.",
+      "dentist": "Your patients, unsigned examinations and today's appointments.",
+      "dental_hygienist": "Patients waiting, recalls due and today's appointments.",
+      "dental_assistant": "Patients waiting and today's appointments.",
+      "dental_technician": "Laboratory cases to make and deliver.",
+      "imaging_staff": "Find the patient to add X-rays and photographs."
     },
     "stats": {
       "active_users": "Active accounts",
@@ -183,7 +193,8 @@
     "reassign_title": "Assign a dentist",
     "send_doctor": "Send to dentist without triage",
     "kind_consult": "See a dentist",
-    "lane_doctor_inline": "waiting for the dentist"
+    "lane_doctor_inline": "waiting for the dentist",
+    "lane_consult": "In the chair"
   },
   "appointments": {
     "all_doctors": "All dentists",
@@ -196,7 +207,8 @@
     "leg_full": "More than 8 per dentist"
   },
   "dash": {
-    "median_wait": "Median wait to see a dentist"
+    "median_wait": "Median wait to see a dentist",
+    "after_consult": "Finishing (payment, booking)"
   },
   "chart": {
     "doctor": "Clinician"

@@ -63,7 +63,7 @@ braces fitted, deposit invoiced and paid, an instalment taken early) and `test_o
 
 Scenario 1 also checks two data-loss cases found while testing:
 
-- Text typed on *Complaint & examination* survives a visit to another tab, and signing is blocked while it is
+- Text typed on *Examination* survives a visit to another tab, and signing is blocked while it is
   unsaved.
 - Procedure notes typed before *Save materials* survive the save and are the ones signed.
 

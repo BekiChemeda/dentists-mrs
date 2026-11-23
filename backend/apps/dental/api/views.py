@@ -9,7 +9,7 @@ from rest_framework import serializers, status
 from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.response import Response
 
-from apps.accounts.models import User
+from apps.accounts.models import Role, User
 from apps.audit.services import record_event
 from apps.core.api import PermissionedView, validated
 from apps.core.concurrency import guarded_edit
@@ -67,6 +67,8 @@ class CatalogView(PermissionedView):
             "image_kinds": DentalImage.Kind.choices, "recall_kinds": Recall.Kind.choices,
             "lab_case_types": DentalLabCase.CaseType.choices,
             "plan_item_priorities": TreatmentPlanItem.Priority.choices,
+            "roles": list(Role.objects.filter(permissions__code="dental.procedure.record").distinct()
+                          .order_by("name").values_list("code", "name")),
             "ortho": {
                 "appliances": OrthoCase.Appliance.choices, "arches": OrthoCase.Arches.choices,
                 "billing_modes": OrthoCase.Billing.choices, "retainers": OrthoCase.Retainer.choices,
@@ -331,7 +333,7 @@ class EncounterListView(PermissionedView):
     required_permissions = {"GET": VIEW}
 
     def get(self, request):
-        qs = DentalEncounter.objects.select_related("dentist").prefetch_related("diagnoses")
+        qs = DentalEncounter.objects.select_related("dentist", "patient").prefetch_related("diagnoses")
         if p := self.param_uuid("patient"):
             qs = qs.filter(patient_id=p)
         if v := self.param_uuid("visit"):

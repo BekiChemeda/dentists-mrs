@@ -253,7 +253,7 @@ export function PerioChart({
       <Banner tone="info">
         {t(
           "dental.perio_hint",
-          "Each site: probing depth / gingival margin in whole mm (margin positive when below the CEJ). B = bleeding, P = plaque. Leave blank if not measured. Protocol pending dentist review.",
+          "Enter two numbers per site in whole mm: pocket depth, then gum margin (positive = recession below the cemento-enamel junction). Tick B for bleeding and P for plaque. Leave a site blank if it was not measured.",
         )}
       </Banner>
       {exam.data === null && prefilled.length > 0 && (

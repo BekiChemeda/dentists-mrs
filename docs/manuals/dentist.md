@@ -13,18 +13,20 @@ examinations**, **Recalls**, **Orthodontics**, **Dental laboratory**, **Reports*
 
 - *Waiting list › **Waiting for dentists***: patients sent to your department, patients not sent anywhere yet, and
   anyone booked with you. Emergencies and urgent patients are first.
-- *My dental examinations*: your drafts and recently signed examinations.
+- *Dashboard*: who is waiting, **Your unsigned examinations** (with **Continue writing**), and today's appointments.
+- *My dental examinations*: your examinations with the patient's name, complaint and diagnoses. It opens on those not
+  signed yet; choose *Signed* or *All examinations* to see the rest.
 - **Manage** on the waiting list starts the examination (or opens yours if it is already started).
 
-The page header shows the patient (name, MRN, sex, age) and a red **Alerts** line: allergies and when the medical
-history was last reviewed. It stays on every tab.
+The page header shows the patient (name, MRN, sex, age) and an **Alerts** line: allergies, any *yes* answers from the
+medical history, and when it was last reviewed. The line is red only when there is something to warn about. It stays on every tab.
 
 ## 2. The examination, tab by tab
 
 | Tab | What you do |
 | --- | --- |
 | **History** | Go through the medical history questions with the patient (heart, diabetes, bleeding, immune, pregnancy, reactions to anaesthetic, surgery…), tick *Allergies checked* and *Current medicines checked*, and **Record review**. The system records who reviewed and when; it does **not** decide whether treatment is safe. On the right: allergies and conditions from the patient record, and the patient's dental history (**Edit**). |
-| **Complaint & examination** | Chief complaint, history, the patient's own words, pain (teeth, severity 0–10, pattern, sensitivity, onset, triggers), extraoral and intraoral findings, assessment, proposed treatment, discussion, consent notes, follow-up instructions. **Save** (the tab shows • while something is unsaved; you cannot sign until it is saved). |
+| **Examination** | Chief complaint, history, the patient's own words, pain (teeth, severity 0–10, pattern, sensitivity, onset, triggers), extraoral and intraoral findings, assessment, proposed treatment, discussion, consent notes, follow-up instructions. **Mark the rest normal** writes *Normal* in every extraoral or intraoral field you left empty; change any that are not. **Save** (the tab shows • while something is unsaved; you cannot sign until it is saved). |
 | **Chart** | The dental chart (see §3). |
 | **Periodontal** | Six sites per tooth (see §4). Only if the clinic uses it. |
 | **Diagnoses** | Search a term (for example *K02*, *caries*, *pulpitis*), choose where (tooth, surfaces, region, whole mouth), certainty, notes, **Add diagnosis**. |
@@ -77,7 +79,7 @@ chart.
 5. After presentation, every change needs a reason and is kept under **Revisions**.
 
 A deferred item keeps the plan *In progress* so it can be accepted later; decline or cancel it to finish the plan.
-Booking an appointment for an item (**Appointment…**) never marks it done; only a signed procedure record does.
+Booking an appointment for an item (**Book appointment**) never marks it done; only a signed procedure record does.
 
 ## 6. Procedure records
 
@@ -100,7 +102,7 @@ the audit log. A wrong image is **withdrawn** with a reason, never deleted. DICO
 
 - *Recalls*: reviews and recalls that are due, overdue or booked. Book an appointment from a recall, log contact
   attempts, postpone, or mark declined or unreachable.
-- *Dental laboratory*: send crowns, bridges and dentures to the laboratory (**Laboratory case…** on the dental
+- *Dental laboratory*: send crowns, bridges and dentures to the laboratory (**New laboratory case** on the dental
   record), follow their status and record delivery.
 
 ## 9. Orthodontics

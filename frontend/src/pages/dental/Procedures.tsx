@@ -105,7 +105,7 @@ export function ProcedureTable({ rows, onOpen }: { rows: ProcedureRecordBrief[];
             <td className="num">{r.price == null ? "—" : money(r.price)}</td>
             <td className="num">
               <button className="btn btn-sm" onClick={() => onOpen(r.id)}>
-                {r.status === "draft" ? t("dental.continue", "Continue") : t("common.view", "View")}
+                {r.status === "draft" ? t("dental.continue_note", "Continue writing") : t("common.view", "View")}
               </button>
             </td>
           </tr>

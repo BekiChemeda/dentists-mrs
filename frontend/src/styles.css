@@ -746,9 +746,9 @@ code,
   flex-direction: column;
   justify-content: flex-start;
   gap: 6px;
-  min-height: 118px;
+  min-height: 92px;
   min-width: 0;
-  padding: 60px 17px 16px;
+  padding: 18px 17px 16px;
   border-radius: 15px;
   background: var(--surface);
   border: 1px solid var(--line-soft);
@@ -757,17 +757,6 @@ code,
 .panel .figure {
   box-shadow: none;
   background: var(--subtle);
-}
-.figure::before {
-  content: "";
-  position: absolute;
-  top: 16px;
-  left: 17px;
-  width: 31px;
-  height: 31px;
-  border-radius: 9px;
-  background: var(--hover);
-  background-image: radial-gradient(circle at 50% 50%, #535ee1 0 3.5px, transparent 4px);
 }
 .figure b {
   font-weight: 800;
@@ -782,16 +771,8 @@ code,
   font-weight: 600;
   line-height: 1.35;
 }
-.figure.attention::before {
-  background-color: var(--amber-tint);
-  background-image: radial-gradient(circle, var(--amber) 0 3.5px, transparent 4px);
-}
 .figure.attention b {
   color: var(--amber-ink);
-}
-.figure.danger::before {
-  background-color: var(--danger-tint);
-  background-image: radial-gradient(circle, var(--danger) 0 3.5px, transparent 4px);
 }
 .figure.danger b {
   color: var(--danger-ink);
@@ -801,10 +782,6 @@ code,
   border-color: transparent;
   color: #fff;
   box-shadow: 0 14px 28px #4a57e833;
-}
-.figures > .figure:first-child:not(.attention):not(.danger)::before {
-  background-color: #ffffff26;
-  background-image: radial-gradient(circle, #fff 0 3.5px, transparent 4px);
 }
 .figures > .figure:first-child:not(.attention):not(.danger) b {
   color: #fff;
@@ -1986,12 +1963,8 @@ table.data tfoot td {
     gap: 10px;
   }
   .figure {
-    min-height: 108px;
-    padding: 56px 14px 14px;
-  }
-  .figure::before {
-    top: 14px;
-    left: 14px;
+    min-height: 84px;
+    padding: 14px;
   }
   .figure b {
     font-size: 1.35rem;
@@ -3268,7 +3241,17 @@ table.data.compact td {
 .checklist li.done span {
   color: var(--ink-2);
 }
+.checklist li::before {
+  content: "○";
+  width: 1.2em;
+  color: var(--ink-3, #8a90a6);
+  font-weight: 700;
+}
 .check-done {
+  color: var(--ok);
+}
+.checklist li.check-done::before {
+  content: "✓";
   color: var(--ok);
 }
 .hours-table input[type="time"] {

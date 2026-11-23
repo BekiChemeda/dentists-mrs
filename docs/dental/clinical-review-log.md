@@ -2,7 +2,7 @@
 
 Nothing in this system has been reviewed by a practising dentist yet. Every item below must be reviewed and
 signed off (name, registration, date, decision) before a pilot. Until then, all seeded clinical content carries
-`review_status = "pending"` and the UI shows *Starter list — pending clinical review* on catalogue screens.
+`review_status = "pending"` and the catalogue screen asks the clinic to check each item and set its own prices. The review status is kept here and in the data, not shown on clinical screens, so staff are not distracted by development notes.
 
 | ID | Item | Where | Question for the reviewer | Status |
 | --- | --- | --- | --- | --- |

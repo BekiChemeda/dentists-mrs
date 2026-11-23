@@ -101,7 +101,7 @@ def sign_encounter(ctx: ActorContext, encounter: DentalEncounter) -> DentalEncou
     if not has_dx and not enc.assessment.strip():
         missing["diagnoses"] = ["Add a diagnosis or write the assessment before signing."]
     if missing:
-        raise BusinessValidationError("The examination is incomplete.", fields=missing)
+        raise BusinessValidationError("The examination cannot be signed yet. Complete the items marked below.", fields=missing)
     enc.status = DentalEncounter.Status.SIGNED
     enc.signed_at = timezone.now()
     enc.version += 1
@@ -200,7 +200,7 @@ def _clean_answers(answers: dict) -> dict:
             problems[key] = ["Answer yes, no, unknown or not applicable."]
             continue
         if answer == "yes" and not detail:
-            problems[key] = ["Give the detail."]
+            problems[key] = ["Give details for this answer."]
         out[key] = {"answer": answer, "detail": detail}
     unknown = set(answers) - set(RISK_QUESTION_KEYS)
     if unknown:

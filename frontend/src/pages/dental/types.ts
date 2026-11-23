@@ -82,6 +82,7 @@ export interface DentalCatalog {
   recall_kinds: [string, string][];
   lab_case_types: [string, string][];
   plan_item_priorities: [string, string][];
+  roles?: [string, string][];
 }
 
 export interface DiagnosisTerm {

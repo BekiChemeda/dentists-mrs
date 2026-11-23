@@ -6,6 +6,7 @@ import { api } from "../api/client";
 import { useAction, useGet } from "../api/hooks";
 import type { Encounter, PatientBrief, Visit } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
+import { formatDay } from "../lib/format";
 import { StateBadge, useTriageDestinations, useTriageLabel } from "../labels";
 import {
   Badge,
@@ -357,7 +358,7 @@ export function QueuePage() {
         <Banner tone="warn">
           {t(
             "queue.stale",
-            "{{n}} visit(s) from earlier days are still open. Complete or close them so reports stay correct.",
+            "Visits from earlier days still open: {{n}}. Complete or close them so the daily reports stay correct.",
             { n: stale.data.length },
           )}{" "}
           {stale.data.slice(0, 5).map((v) => (
@@ -368,7 +369,7 @@ export function QueuePage() {
               style={{ marginRight: 10 }}
               onClick={() => setAction({ kind: v.status === "after_consult" ? "complete" : "remove", visit: v })}
             >
-              {v.patient.full_name} ({v.visit_date})
+              {v.patient.full_name} ({formatDay(v.visit_date)})
             </button>
           ))}
         </Banner>
@@ -408,7 +409,7 @@ export function QueuePage() {
         {q.isLoading ? (
           <Loading />
         ) : rows.length === 0 ? (
-          <Empty>{t("queue.lane_empty", "Nobody here.")}</Empty>
+          <Empty>{t("queue.lane_empty", "No patients in this list.")}</Empty>
         ) : (
           <div className="table-wrap">
             <table className="data waiting-list">

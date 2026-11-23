@@ -15,7 +15,7 @@ import type {
 } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { StateBadge } from "../labels";
-import { formatDateTime, formatLongDate, isoDateDaysAgo } from "../lib/format";
+import { formatDateTime, formatDay, formatLongDate, isoDateDaysAgo } from "../lib/format";
 import { dashboardFor } from "../navigation";
 import { Empty, PageHead, Panel } from "../ui";
 import { SummaryFigures, type DailySummary } from "./billing";
@@ -44,11 +44,13 @@ export function DashboardPage() {
       node: <ClinicTrendsBlock />,
     },
     { key: "critical", show: can("clinical.write"), node: <CriticalBlock /> },
+    { key: "labcases", show: can("dental.labcase.work"), node: <LabCasesBlock /> },
     {
       key: "queue",
       show: can("queue.manage", "triage.record", "clinical.write", "dental.write"),
       node: <QueueBlock />,
     },
+    { key: "unsigned", show: can("dental.write"), node: <UnsignedExamsBlock /> },
     { key: "appointments", show: can("appointments.view") && kind !== "doctor", node: <AppointmentsBlock /> },
     { key: "lab", show: can("lab.result.enter"), node: <LabBlock /> },
     { key: "pharmacy", show: can("pharmacy.dispense"), node: <PharmacyBlock /> },
@@ -212,6 +214,85 @@ function QueueBlock() {
                   {x.priority !== "routine" && <StateBadge set="priority" value={x.priority} />}
                 </td>
                 <td className="num">{waitLabel(x.waiting_minutes)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Panel>
+  );
+}
+
+function UnsignedExamsBlock() {
+  const { t } = useTranslation();
+  const q = useGet<Paginated<{ id: string; created_at: string; patient: PatientBrief; chief_complaint: string }>>(
+    ["dental", "encounters", "draft", 1],
+    `/dental/encounters/${queryString({ mine: "true", status: "draft", page: 1 })}`,
+  );
+  const rows = q.data?.results ?? [];
+  if (!rows.length) return null;
+  return (
+    <Panel
+      title={t("dash.unsigned_exams", "Your unsigned examinations ({{n}})", { n: q.data?.count ?? rows.length })}
+      actions={
+        <Link className="btn btn-sm" to="/dental/encounters">
+          {t("dash.see_all", "See all")}
+        </Link>
+      }
+      flush
+    >
+      <table className="data">
+        <tbody>
+          {rows.slice(0, 5).map((e) => (
+            <tr key={e.id}>
+              <td className="nowrap muted">{formatDateTime(e.created_at)}</td>
+              <td>
+                <strong>{e.patient.full_name}</strong> <span className="mono small subtle">{e.patient.mrn}</span>
+              </td>
+              <td className="muted">{e.chief_complaint || "—"}</td>
+              <td className="num">
+                <Link className="btn btn-sm btn-primary" to={`/dental/encounters/${e.id}`}>
+                  {t("dental.continue_note", "Continue writing")}
+                </Link>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Panel>
+  );
+}
+
+function LabCasesBlock() {
+  const { t } = useTranslation();
+  const q = useGet<
+    Paginated<{ id: string; number: string; patient: PatientBrief; case_type_label: string; due_date: string | null }>
+  >(["dental", "lab-cases", "dash"], "/dental/lab-cases/");
+  const rows = q.data?.results ?? [];
+  const today = todayIso();
+  return (
+    <Panel
+      title={t("dash.lab_cases", "Laboratory work in progress")}
+      actions={
+        <Link className="btn btn-sm" to="/dental/lab-cases">
+          {t("dash.open_lab", "Open laboratory")}
+        </Link>
+      }
+      flush
+    >
+      {!rows.length ? (
+        <Empty>{t("dash.no_lab_cases", "No open laboratory cases.")}</Empty>
+      ) : (
+        <table className="data">
+          <tbody>
+            {rows.slice(0, 8).map((c) => (
+              <tr key={c.id}>
+                <td className="mono small">{c.number}</td>
+                <td>{c.patient.full_name}</td>
+                <td className="muted">{c.case_type_label}</td>
+                <td className={`num nowrap${c.due_date && c.due_date < today ? " text-danger" : ""}`}>
+                  {c.due_date ? t("dash.due", "Due {{d}}", { d: formatDay(c.due_date) }) : "—"}
+                </td>
               </tr>
             ))}
           </tbody>

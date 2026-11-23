@@ -23,9 +23,9 @@ import {
   money,
   toast,
 } from "../../ui";
-import { formatDateTime } from "../../lib/format";
+import { formatDateTime, formatDay } from "../../lib/format";
 import { ChartView } from "./ChartView";
-import { DentalStatus, PENDING_REVIEW_NOTE, useDentalCatalog } from "./common";
+import { DentalStatus, useDentalCatalog } from "./common";
 import { ImagesPanel } from "./Images";
 import { OrthoPanel } from "./Ortho";
 import { PerioHistory } from "./Perio";
@@ -90,7 +90,7 @@ export function DentalPatientPage() {
           <>
             {can("dental.labcase.manage") && moduleOn("dental_lab") && (
               <button className="btn" onClick={() => setLabCase(true)}>
-                {t("dental.new_case", "Laboratory case…")}
+                {t("dental.new_case", "New laboratory case")}
               </button>
             )}
             <Link className="btn" to={`/patients/${id}`}>
@@ -189,7 +189,7 @@ function PatientRecalls({ patientId }: { patientId: string }) {
           <tbody>
             {q.data.map((r) => (
               <tr key={r.id}>
-                <td>{r.due_date}</td>
+                <td className="nowrap">{formatDay(r.due_date)}</td>
                 <td>
                   {r.kind_label}
                   {r.note && <div className="small subtle">{r.note}</div>}
@@ -214,7 +214,7 @@ export function DentalEncountersPage() {
   const { t } = useTranslation();
   const [status, setStatus] = useState("draft");
   const [page, setPage] = useState(1);
-  const q = useGet<Paginated<EncounterBrief & { patient: string }>>(
+  const q = useGet<Paginated<EncounterBrief & { patient: { id: string; mrn: string; full_name: string } }>>(
     ["dental", "encounters", status, page],
     `/dental/encounters/${queryString({ mine: "true", status, page })}`,
   );
@@ -222,12 +222,15 @@ export function DentalEncountersPage() {
     <div className="stack">
       <PageHead
         title={t("nav.dental_encounters", "My dental examinations")}
-        sub={t("dental.encounters_sub", "Start a new examination from the waiting list.")}
+        sub={t(
+          "dental.encounters_sub",
+          "Examinations you started. A draft is not part of the record until you sign it. To start a new one, call the patient from the waiting list.",
+        )}
         actions={
           <select aria-label={t("users.status")} value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="draft">{t("dental.status_draft", "Draft")}</option>
-            <option value="signed">{t("dental.status_signed", "Signed")}</option>
-            <option value="">{t("common.all", "All")}</option>
+            <option value="draft">{t("dental.unsigned_only", "Not signed yet")}</option>
+            <option value="signed">{t("dental.signed_only", "Signed")}</option>
+            <option value="">{t("dental.all_examinations", "All examinations")}</option>
           </select>
         }
       />
@@ -236,21 +239,41 @@ export function DentalEncountersPage() {
         {q.isLoading ? (
           <Loading />
         ) : !q.data?.results.length ? (
-          <Empty>{t("dental.none_here", "Nothing here.")}</Empty>
+          <Empty>
+            {status === "draft"
+              ? t("dental.no_unsigned", "You have no unsigned examinations.")
+              : t("dental.no_encounters_match", "No examinations match this filter.")}
+          </Empty>
         ) : (
           <table className="data">
+            <thead>
+              <tr>
+                <th>{t("dental.started", "Started")}</th>
+                <th>{t("dental.patient", "Patient")}</th>
+                <th>{t("dental.chief_complaint_short", "Complaint")}</th>
+                <th>{t("dental.diagnoses", "Diagnoses")}</th>
+                <th>{t("users.status")}</th>
+                <th />
+              </tr>
+            </thead>
             <tbody>
               {q.data.results.map((e) => (
                 <tr key={e.id}>
-                  <td>{formatDateTime(e.created_at)}</td>
+                  <td className="nowrap">{formatDateTime(e.created_at)}</td>
+                  <td>
+                    <strong>{e.patient.full_name}</strong> <span className="mono small subtle">{e.patient.mrn}</span>
+                  </td>
                   <td>{e.chief_complaint || <span className="subtle">—</span>}</td>
                   <td className="small subtle">{e.diagnoses.join("; ")}</td>
                   <td>
                     <DentalStatus value={e.status} />
                   </td>
                   <td className="num">
-                    <Link className="btn btn-sm btn-primary" to={`/dental/encounters/${e.id}`}>
-                      {t("common.open", "Open")}
+                    <Link
+                      className={`btn btn-sm${e.status === "draft" ? " btn-primary" : ""}`}
+                      to={`/dental/encounters/${e.id}`}
+                    >
+                      {e.status === "draft" ? t("dental.continue_note", "Continue writing") : t("common.view", "View")}
                     </Link>
                   </td>
                 </tr>
@@ -267,6 +290,13 @@ export function DentalEncountersPage() {
 // ===========================================================================
 // Recall worklist
 // ===========================================================================
+const OUTCOMES: Record<string, string> = {
+  reached: "Spoke to the patient",
+  no_answer: "No answer",
+  message_left: "Message left",
+  wrong_number: "Wrong or unavailable number",
+};
+
 export function RecallsPage() {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -313,7 +343,7 @@ export function RecallsPage() {
                 <th>{t("dental.due", "Due")}</th>
                 <th>{t("dental.patient", "Patient")}</th>
                 <th>{t("dental.phone", "Phone")}</th>
-                <th>{t("dental.recall_kind", "Kind")}</th>
+                <th>{t("dental.recall_type", "Type")}</th>
                 <th>{t("users.status")}</th>
                 <th>{t("dental.contacts", "Contact attempts")}</th>
                 <th />
@@ -322,10 +352,12 @@ export function RecallsPage() {
             <tbody>
               {q.data.results.map((r) => (
                 <tr key={r.id} className={r.due_date < today && r.status !== "booked" ? "overdue" : ""}>
-                  <td>
-                    {r.due_date}
+                  <td className="nowrap">
+                    {formatDay(r.due_date)}
                     {r.due_date < today && r.status !== "booked" && (
-                      <span className="badge badge-danger">{t("dental.overdue", "overdue")}</span>
+                      <div>
+                        <span className="badge badge-danger">{t("dental.overdue", "Overdue")}</span>
+                      </div>
                     )}
                   </td>
                   <td>
@@ -340,34 +372,34 @@ export function RecallsPage() {
                   </td>
                   <td className="small">
                     {r.contacts.length
-                      ? `${r.contacts.length} · ${r.contacts[0].outcome.replace("_", " ")} (${formatDateTime(r.contacts[0].at)})`
+                      ? `${r.contacts.length} · ${t(`dental.outcome_${r.contacts[0].outcome}`, OUTCOMES[r.contacts[0].outcome] ?? r.contacts[0].outcome)} (${formatDateTime(r.contacts[0].at)})`
                       : "—"}
                   </td>
                   <td className="num">
                     {can("dental.recall.manage") && ["due", "postponed", "booked"].includes(r.status) && (
-                      <div className="row">
+                      <div className="row" style={{ flexWrap: "nowrap", justifyContent: "flex-end" }}>
                         {r.status !== "booked" && (
                           <button
                             className="btn btn-sm btn-primary"
                             onClick={() => setActing({ recall: r, kind: "book" })}
                           >
-                            {t("dental.book", "Book…")}
+                            {t("dental.book", "Book")}
                           </button>
                         )}
                         <button className="btn btn-sm" onClick={() => setActing({ recall: r, kind: "contact" })}>
-                          {t("dental.log_contact", "Log call…")}
+                          {t("dental.log_contact", "Log call")}
                         </button>
                         <button
                           className="btn btn-sm btn-ghost"
                           onClick={() => setActing({ recall: r, kind: "postpone" })}
                         >
-                          {t("dental.postpone", "Postpone…")}
+                          {t("dental.postpone", "Postpone")}
                         </button>
                         <button
                           className="btn btn-sm btn-ghost"
                           onClick={() => setActing({ recall: r, kind: "close" })}
                         >
-                          {t("dental.close", "Close…")}
+                          {t("dental.close", "Close")}
                         </button>
                       </div>
                     )}
@@ -594,7 +626,7 @@ export function LabCasesPage() {
                     <div className="small prewrap">{c.instructions}</div>
                   </td>
                   <td>{c.teeth.join(", ")}</td>
-                  <td>{c.due_date ?? "—"}</td>
+                  <td className="nowrap">{formatDay(c.due_date)}</td>
                   <td>{c.technician?.full_name ?? "—"}</td>
                   <td>
                     <DentalStatus value={c.status} />
@@ -682,7 +714,7 @@ export function NewLabCase({ patientId, onDone }: { patientId: string; onDone: (
             ))}
           </select>
         </Field>
-        <Field label={t("dental.teeth", "Teeth (FDI)")} id="f-teeth" error={create.error}>
+        <Field label={t("dental.teeth", "Teeth (e.g. 11, 21)")} id="f-teeth" error={create.error}>
           <input id="f-teeth" value={f.teeth} onChange={(e) => setF({ ...f, teeth: e.target.value })} />
         </Field>
         <Field label={t("dental.shade", "Shade")} id="f-shade">
@@ -749,7 +781,12 @@ export function DentalCataloguePage() {
         title={t("nav.dental_catalogue", "Dental catalogue")}
         sub={t("dental.catalogue_sub", "Procedures and prices, chart findings, diagnoses and appointment types.")}
       />
-      <Banner tone="warn">{t("dental.pending_review", PENDING_REVIEW_NOTE)}</Banner>
+      <p className="small muted">
+        {t(
+          "dental.catalogue_check",
+          "The starter list comes with sample names and prices. Check each item and set your clinic's own prices before you start charging patients.",
+        )}
+      </p>
       <Tabs
         tabs={[
           { key: "procedures", label: t("dental.procedures_prices", "Procedures and prices") },
@@ -836,6 +873,7 @@ function ProcedureCatalogue() {
             proc={editing === "new" ? null : editing}
             categories={catalog.data?.procedure_categories ?? []}
             recallKinds={catalog.data?.recall_kinds ?? []}
+            roles={catalog.data?.roles ?? []}
             onDone={() => {
               setEditing(null);
               void qc.invalidateQueries({ queryKey: ["dental"] });
@@ -851,11 +889,13 @@ function ProcedureForm({
   proc,
   categories,
   recallKinds,
+  roles,
   onDone,
 }: {
   proc: DentalProcedure | null;
   categories: [string, string][];
   recallKinds: [string, string][];
+  roles: [string, string][];
   onDone: () => void;
 }) {
   const { t } = useTranslation();
@@ -875,7 +915,7 @@ function ProcedureForm({
     billing_mode: proc?.billing_mode ?? "on_completion",
     follow_up_kind: proc?.follow_up_kind ?? "",
     follow_up_days: proc?.follow_up_days == null ? "" : String(proc.follow_up_days),
-    performer_roles: (proc?.performer_roles ?? []).join(", "),
+    performer_roles: proc?.performer_roles ?? [],
   });
   const save = useMutation({
     mutationFn: () => {
@@ -884,7 +924,6 @@ function ProcedureForm({
         default_minutes: Number(f.default_minutes),
         typical_sessions: Number(f.typical_sessions),
         follow_up_days: f.follow_up_days === "" ? null : Number(f.follow_up_days),
-        performer_roles: f.performer_roles.split(/[\s,]+/).filter(Boolean),
       };
       return proc
         ? api.patch(`/dental/procedures/${proc.id}/`, body, { ifMatch: proc.row_version })
@@ -966,11 +1005,34 @@ function ProcedureForm({
           </select>
         </Field>
         {input("follow_up_days", t("dental.follow_up_days", "Follow-up after (days)"), "number")}
-        {input(
-          "performer_roles",
-          t("dental.performer_roles", "Only these roles may perform it (role codes, optional)"),
-        )}
       </div>
+      {!!roles.length && (
+        <fieldset className="form-group">
+          <legend>{t("dental.performer_roles", "Who may perform it")}</legend>
+          <p className="small muted">
+            {t("dental.performer_roles_hint", "Leave all unticked to allow any clinician.")}
+          </p>
+          <div className="row">
+            {roles.map(([code, name]) => (
+              <label key={code} className="check">
+                <input
+                  type="checkbox"
+                  checked={f.performer_roles.includes(code)}
+                  onChange={(e) =>
+                    setF({
+                      ...f,
+                      performer_roles: e.target.checked
+                        ? [...f.performer_roles, code]
+                        : f.performer_roles.filter((r) => r !== code),
+                    })
+                  }
+                />{" "}
+                {name}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
       <div className="row">
         <label className="check">
           <input
@@ -1025,7 +1087,7 @@ function FindingCatalogue() {
             <tr>
               <th>{t("dental.symbol", "Symbol")}</th>
               <th>{t("dental.name", "Name")}</th>
-              <th>{t("dental.kind", "Kind")}</th>
+              <th>{t("dental.finding_category", "Category")}</th>
               <th>{t("dental.applies_to", "Applies to")}</th>
               <th>{t("users.status")}</th>
               <th />

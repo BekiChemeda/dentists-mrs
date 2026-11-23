@@ -29,18 +29,9 @@ import {
   toast,
   type BadgeTone,
 } from "../../ui";
-import { formatDateTime } from "../../lib/format";
-import { PENDING_REVIEW_NOTE, useDentalCatalog } from "./common";
+import { formatDateTime, formatDay } from "../../lib/format";
+import { useDentalCatalog } from "./common";
 import type { DentalImage } from "./types";
-
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  return new Date(`${iso.slice(0, 10)}T00:00:00`).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
 
 // ---------------------------------------------------------------------------------------------------------- types
 export interface OrthoAssessment {
@@ -217,6 +208,23 @@ const ALL_ASSESSMENT_FIELDS = [
   ...ASSESSMENT_LONG_TEXT.map(([k]) => k),
 ];
 
+const EVENT_LABELS: Record<string, string> = {
+  create: "Case opened",
+  start: "Treatment started",
+  retention: "Moved to retention",
+  complete: "Case completed",
+  discontinue: "Case discontinued",
+  billing_change: "Payment method changed",
+  instalment_forward: "Instalment brought forward",
+  visit_void: "Visit marked as entered in error",
+  update: "Case details changed",
+};
+
+function eventLabel(action: string, t: (k: string, d: string) => string): string {
+  const d = EVENT_LABELS[action];
+  return d ? t(`dental.ortho_event_${action}`, d) : action.replace(/_/g, " ");
+}
+
 export function OrthoAssessmentForm({ encounterId, editable }: { encounterId: string; editable: boolean }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -257,7 +265,6 @@ export function OrthoAssessmentForm({ encounterId, editable }: { encounterId: st
       }
     >
       <div className="stack">
-        <p className="small muted">{PENDING_REVIEW_NOTE}</p>
         <ErrorBanner error={save.error} onReload={() => setDirty(false)} />
         <div className="form-grid">
           {ASSESSMENT_CHOICES.map(([k, label, list]) => (
@@ -364,10 +371,10 @@ export function OrthoPanel({ patientId, encounterId }: { patientId: string; enco
             <tbody>
               {closed.map((c) => (
                 <tr key={c.id}>
-                  <td className="mono">{c.number}</td>
+                  <td className="mono nowrap">{c.number}</td>
                   <td>{c.appliance_label}</td>
                   <td>
-                    {c.started_on ? formatDate(c.started_on) : "—"} → {c.closed_on ? formatDate(c.closed_on) : "—"}
+                    {c.started_on ? formatDay(c.started_on) : "—"} → {c.closed_on ? formatDay(c.closed_on) : "—"}
                   </td>
                   <td>
                     <Badge tone={STATUS_TONE[c.status]}>{c.status_label}</Badge>
@@ -484,13 +491,13 @@ function OrthoCaseDetail({ c, encounterId, patientId }: { c: OrthoCase; encounte
           <dt>{t("dental.ortho_orthodontist", "Dentist")}</dt>
           <dd>{c.orthodontist.full_name}</dd>
           <dt>{t("dental.ortho_started", "Started")}</dt>
-          <dd>{c.started_on ? formatDate(c.started_on) : t("dental.ortho_not_started", "Not started")}</dd>
+          <dd>{c.started_on ? formatDay(c.started_on) : t("dental.ortho_not_started", "Not started")}</dd>
           <dt>{t("dental.ortho_in_treatment", "In treatment")}</dt>
           <dd>{months}</dd>
           {c.debonded_on && (
             <>
               <dt>{t("dental.ortho_debonded", "Braces removed")}</dt>
-              <dd>{formatDate(c.debonded_on)}</dd>
+              <dd>{formatDay(c.debonded_on)}</dd>
             </>
           )}
           {(c.retainer_upper || c.retainer_lower) && (
@@ -503,7 +510,7 @@ function OrthoCaseDetail({ c, encounterId, patientId }: { c: OrthoCase; encounte
             </>
           )}
           <dt>{t("dental.ortho_last_visit", "Last visit")}</dt>
-          <dd>{c.last_visit ? `${formatDate(c.last_visit.date)} · ${c.last_visit.kind}` : "—"}</dd>
+          <dd>{c.last_visit ? `${formatDay(c.last_visit.date)} · ${c.last_visit.kind}` : "—"}</dd>
           {c.objectives && (
             <>
               <dt>{t("dental.ortho_objectives", "Objectives")}</dt>
@@ -543,7 +550,7 @@ function OrthoCaseDetail({ c, encounterId, patientId }: { c: OrthoCase; encounte
                 {c.visits.map((v) => (
                   <tr key={v.id} className={v.status === "entered_in_error" ? "struck" : undefined}>
                     <td>
-                      {formatDate(v.visit_date)}
+                      {formatDay(v.visit_date)}
                       <div className="small muted">{v.performed_by.full_name}</div>
                     </td>
                     <td>
@@ -608,7 +615,7 @@ function OrthoCaseDetail({ c, encounterId, patientId }: { c: OrthoCase; encounte
           <ul className="plain-list small">
             {c.events.map((e, i) => (
               <li key={i}>
-                {formatDateTime(e.at)} · {e.by} · <strong>{e.action.replace(/_/g, " ")}</strong>
+                {formatDateTime(e.at)} · {e.by} · <strong>{eventLabel(e.action, t)}</strong>
                 {e.note ? ` — ${e.note}` : ""}
               </li>
             ))}
@@ -761,7 +768,7 @@ function OrthoPayment({
             {live.map((i) => (
               <tr key={i.id}>
                 <td>{i.label}</td>
-                <td>{formatDate(i.due_date)}</td>
+                <td>{formatDay(i.due_date)}</td>
                 <td className="num">{money(i.amount)}</td>
                 <td>
                   <Badge tone={INSTALMENT[i.state][1]}>{t(`dental.inst_${i.state}`, INSTALMENT[i.state][0])}</Badge>
@@ -792,7 +799,7 @@ function OrthoPayment({
             <ul className="plain-list small">
               {cancelled.map((i) => (
                 <li key={i.id}>
-                  {i.label} · {formatDate(i.due_date)} · {money(i.amount)} — {i.cancelled_reason}
+                  {i.label} · {formatDay(i.due_date)} · {money(i.amount)} — {i.cancelled_reason}
                 </li>
               ))}
             </ul>
@@ -893,13 +900,13 @@ function PackageFields({
           {alreadyInvoiced > 0 &&
             `${t("dental.ortho_already_invoiced", "Already invoiced")}: ${money(alreadyInvoiced.toFixed(2))} ETB. `}
           {deposit > 0 &&
-            `${t("dental.ortho_deposit_short", "Deposit")} ${money(deposit.toFixed(2))} ETB (${formatDate(first)}), `}
+            `${t("dental.ortho_deposit_short", "Deposit")} ${money(deposit.toFixed(2))} ETB (${formatDay(first)}), `}
           {rest > 0 &&
             t("dental.ortho_schedule_preview", "{{count}} × about {{each}} ETB every {{interval}} days from {{from}}", {
               count,
               each: money(each.toFixed(2)),
               interval,
-              from: formatDate(deposit > 0 ? addDays(first, interval) : first),
+              from: formatDay(deposit > 0 ? addDays(first, interval) : first),
             })}
         </Banner>
       )}
@@ -1507,7 +1514,7 @@ function ProgressPhotos({ patientId, since }: { patientId: string; since: string
               <select id="pp-a" value={a} onChange={(e) => setA(e.target.value)}>
                 {dates.map((d) => (
                   <option key={d} value={d}>
-                    {formatDate(d)}
+                    {formatDay(d)}
                   </option>
                 ))}
               </select>
@@ -1516,7 +1523,7 @@ function ProgressPhotos({ patientId, since }: { patientId: string; since: string
               <select id="pp-b" value={b} onChange={(e) => setB(e.target.value)}>
                 {dates.map((d) => (
                   <option key={d} value={d}>
-                    {formatDate(d)}
+                    {formatDay(d)}
                   </option>
                 ))}
               </select>
@@ -1581,7 +1588,7 @@ export function OrthoCasesPage() {
                 <th>{t("dental.ortho_case", "Case")}</th>
                 <th>{t("common.status", "Status")}</th>
                 <th>{t("dental.ortho_appliance", "Appliance")}</th>
-                <th>{t("dental.ortho_in_treatment", "In treatment")}</th>
+                <th>{t("dental.ortho_months", "Months (done / planned)")}</th>
                 <th>{t("dental.ortho_last_visit", "Last visit")}</th>
                 <th>{t("dental.ortho_billing", "Charged")}</th>
               </tr>
@@ -1603,7 +1610,7 @@ export function OrthoCasesPage() {
                       ? "—"
                       : `${c.months_in_treatment}${c.expected_months ? ` / ${c.expected_months}` : ""}`}
                   </td>
-                  <td>{c.last_visit ? `${formatDate(c.last_visit.date)} · ${c.last_visit.kind}` : "—"}</td>
+                  <td>{c.last_visit ? `${formatDay(c.last_visit.date)} · ${c.last_visit.kind}` : "—"}</td>
                   <td className="small">{c.billing_label}</td>
                 </tr>
               ))}

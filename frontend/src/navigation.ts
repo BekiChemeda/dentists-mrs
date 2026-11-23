@@ -93,6 +93,11 @@ export type DashboardKind =
   | "clinic_admin"
   | "clinic_director"
   | "doctor"
+  | "dentist"
+  | "dental_hygienist"
+  | "dental_assistant"
+  | "dental_technician"
+  | "imaging_staff"
   | "nurse"
   | "receptionist"
   | "lab_technician"
@@ -105,6 +110,11 @@ export type DashboardKind =
 /** When a user holds several roles, the first match in this order decides the home dashboard. */
 const DASHBOARD_PRIORITY: DashboardKind[] = [
   "doctor",
+  "dentist",
+  "dental_hygienist",
+  "dental_assistant",
+  "dental_technician",
+  "imaging_staff",
   "nurse",
   "lab_technician",
   "pharmacist",
