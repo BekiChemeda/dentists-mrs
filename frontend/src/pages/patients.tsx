@@ -17,7 +17,7 @@ import { api, queryString } from "../api/client";
 import { useAction, useGet } from "../api/hooks";
 import type { Paginated, Patient, PatientBrief, Visit } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
-import { formatDateTime } from "../lib/format";
+import { formatDateTime, formatDay } from "../lib/format";
 import {
   Banner,
   Empty,
@@ -313,7 +313,7 @@ export function PatientChart() {
               {p.birth_date_estimated ? ` (${t("patients.estimated", "estimated")})` : ""}
             </span>
             <span>
-              {t("patients.born", "Born")} <b>{p.birth_date}</b>
+              {t("patients.born", "Born")} <b>{formatDay(p.birth_date)}</b>
               <Ec value={p.birth_date} />
             </span>
             {p.blood_group && (
@@ -797,7 +797,7 @@ function MergeForm({ keep, onDone }: { keep: Patient; onDone: () => void }) {
     ["MRN", (p) => p.mrn],
     [t("patients.name", "Name"), (p) => p.full_name],
     [t("patients.sex", "Sex"), (p) => p.sex],
-    [t("patients.born", "Born"), (p) => `${p.birth_date ?? "—"}${p.birth_date_estimated ? " (est.)" : ""}`],
+    [t("patients.born", "Born"), (p) => `${formatDay(p.birth_date)}${p.birth_date_estimated ? " (est.)" : ""}`],
     [t("patients.phone", "Phone"), (p) => [p.phone, p.alt_phone].filter(Boolean).join(", ") || "—"],
     [
       t("patients.address", "Address"),

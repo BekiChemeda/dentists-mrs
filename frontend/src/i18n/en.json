@@ -217,5 +217,8 @@
     "none": "No chairs or rooms yet. Add the chairs where dentists see patients.",
     "title": "Chairs and rooms",
     "sub": "Dental chairs and treatment rooms. Appointment types can name a default chair; two appointments cannot share a chair at the same time. Dentists choose the chair they work at today, and the waiting list tells the patient where to go."
+  },
+  "clinic": {
+    "auto_close_hint": "A visit closes by itself this long after the dentist signs, but only when nothing is left: medicines dispensed and the bill paid. Visits with anything open still wait for staff."
   }
 }

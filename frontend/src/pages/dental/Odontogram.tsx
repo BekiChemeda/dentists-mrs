@@ -3,7 +3,7 @@
  * who recorded it and when (ADR 0006). Symbols and text carry the meaning; colour is only a second cue, so the
  * chart stays readable in grayscale print and for colour-blind staff.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api/client";
@@ -88,6 +88,18 @@ function ToothDiagram({ tooth, findings }: { tooth: number; findings: Finding[] 
   );
 }
 
+const QUADRANT: Record<number, string> = { 1: "ur", 2: "ul", 3: "ll", 4: "lr", 5: "ur", 6: "ul", 7: "ll", 8: "lr" };
+const QUADRANT_LABEL: Record<number, string> = {
+  1: "Upper right",
+  2: "Upper left",
+  3: "Lower left",
+  4: "Lower right",
+  5: "Upper right (primary)",
+  6: "Upper left (primary)",
+  7: "Lower left (primary)",
+  8: "Lower right (primary)",
+};
+
 export function Odontogram({
   findings,
   dentition,
@@ -110,35 +122,46 @@ export function Odontogram({
       </div>
       {rows.map((row, i) => (
         <div key={i} className={`odontogram-row${i === rows.length / 2 - 1 ? " arch-gap" : ""}`}>
-          {row.map((tooth) => {
-            const list = byTooth.get(tooth) ?? [];
-            const label = list.length
-              ? `${t("dental.tooth", "Tooth")} ${tooth}: ${list
-                  .map((f) => `${f.finding_type.name}${f.location.surfaces ? ` ${f.location.surfaces}` : ""}`)
-                  .join("; ")}`
-              : `${t("dental.tooth", "Tooth")} ${tooth}: ${t("dental.no_findings", "no findings")}`;
-            return (
-              <button
-                key={tooth}
-                type="button"
-                className={`tooth${selected === tooth ? " selected" : ""}${list.length ? " has-findings" : ""}`}
-                aria-pressed={selected === tooth}
-                aria-label={label}
-                title={label}
-                onClick={() => onSelect(tooth)}
-              >
-                <span className="tooth-num">{tooth}</span>
-                <ToothDiagram tooth={tooth} findings={list} />
-                <span className="tooth-symbols">
-                  {list.map((f) => (
-                    <span key={f.id} className={`sym sym-${f.finding_type.kind}`}>
-                      {f.finding_type.symbol}
+          {[row.slice(0, row.length / 2), row.slice(row.length / 2)].map((half) => (
+            <div
+              key={half[0]}
+              className="quadrant"
+              data-label={t(
+                `dental.quadrant_${QUADRANT[Math.floor(half[0] / 10)]}`,
+                QUADRANT_LABEL[Math.floor(half[0] / 10)],
+              )}
+            >
+              {half.map((tooth) => {
+                const list = byTooth.get(tooth) ?? [];
+                const label = list.length
+                  ? `${t("dental.tooth", "Tooth")} ${tooth}: ${list
+                      .map((f) => `${f.finding_type.name}${f.location.surfaces ? ` ${f.location.surfaces}` : ""}`)
+                      .join("; ")}`
+                  : `${t("dental.tooth", "Tooth")} ${tooth}: ${t("dental.no_findings", "no findings")}`;
+                return (
+                  <button
+                    key={tooth}
+                    type="button"
+                    className={`tooth${selected === tooth ? " selected" : ""}${list.length ? " has-findings" : ""}`}
+                    aria-pressed={selected === tooth}
+                    aria-label={label}
+                    title={label}
+                    onClick={() => onSelect(tooth)}
+                  >
+                    <span className="tooth-num">{tooth}</span>
+                    <ToothDiagram tooth={tooth} findings={list} />
+                    <span className="tooth-symbols">
+                      {list.map((f) => (
+                        <span key={f.id} className={`sym sym-${f.finding_type.kind}`}>
+                          {f.finding_type.symbol}
+                        </span>
+                      ))}
                     </span>
-                  ))}
-                </span>
-              </button>
-            );
-          })}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </div>
       ))}
     </div>
@@ -304,8 +327,16 @@ export function ToothPanel({
   });
 
   const past = history.filter((f) => !current.some((c) => c.id === f.id));
+  const panelRef = useRef<HTMLDivElement>(null);
+  // On a phone the panel sits below the chart: bring it into view when a tooth is chosen.
+  useEffect(() => {
+    const el = panelRef.current;
+    if (el && el.getBoundingClientRect().top > window.innerHeight * 0.6) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [tooth]);
   return (
-    <div className="stack-sm tooth-panel">
+    <div className="stack-sm tooth-panel" ref={panelRef}>
       <h3>
         {isMouth ? t("dental.mouth_regions", "Whole mouth and regions") : `${t("dental.tooth", "Tooth")} ${tooth}`}
       </h3>

@@ -276,6 +276,12 @@ export function PerioChart({
             </p>
           )}
         </div>
+        <p className="small muted phone-only">
+          {t(
+            "dental.perio_scroll",
+            "Swipe the chart sideways to see all teeth. A tablet or computer is easier for charting.",
+          )}
+        </p>
         <div className="table-wrap">
           <table className="data perio-table">
             <thead>

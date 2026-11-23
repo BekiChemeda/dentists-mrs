@@ -6,8 +6,8 @@ import { api, queryString } from "../api/client";
 import { useAction, useGet } from "../api/hooks";
 import type { Approval, Invoice, Paginated, Payment, PatientBrief, ServicePrice, Visit } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
-import { PAYMENT_METHODS, StateBadge } from "../labels";
-import { formatDateTime } from "../lib/format";
+import { PAYMENT_METHODS, StateBadge, useStateLabel } from "../labels";
+import { formatDateTime, formatDay } from "../lib/format";
 import {
   Segmented,
   Banner,
@@ -225,6 +225,7 @@ export function SummaryFigures({ s }: { s: DailySummary }) {
 
 function NewInvoiceForm({ onDone }: { onDone: (inv: Invoice) => void }) {
   const { t } = useTranslation();
+  const stateLabel = useStateLabel();
   const [patient, setPatient] = useState<PatientBrief | null>(null);
   const [visit, setVisit] = useState("");
   const visits = useGet<Paginated<Visit>>(
@@ -269,7 +270,8 @@ function NewInvoiceForm({ onDone }: { onDone: (inv: Invoice) => void }) {
             <option value="">{t("billing.no_visit", "No visit (counter sale or service only)")}</option>
             {visits.data?.results.map((v) => (
               <option key={v.id} value={v.id}>
-                {v.visit_date}, ticket {v.queue_number}, {v.status.replace("_", " ")}
+                {formatDay(v.visit_date)}, {t("billing.ticket", "ticket")} {v.queue_number},{" "}
+                {stateLabel("visit", v.status)}
               </option>
             ))}
           </select>
@@ -333,7 +335,7 @@ export function InvoicePage() {
         sub={
           <>
             {t("billing.created", "Created {{when}}", { when: formatDateTime(i.created_at) })}
-            {i.visit_date ? `, ${t("billing.for_visit", "visit of {{d}}", { d: i.visit_date })}` : ""}
+            {i.visit_date ? `, ${t("billing.for_visit", "visit of {{d}}", { d: formatDay(i.visit_date) })}` : ""}
           </>
         }
         actions={<StateBadge set="invoice" value={i.status} />}

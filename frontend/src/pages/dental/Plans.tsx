@@ -86,7 +86,12 @@ export function PlanList({
       <div className="row-between">
         <div className="row">
           {list.map((p) => (
-            <button key={p.id} className="btn btn-sm" aria-pressed={shown === p.id} onClick={() => setOpen(p.id)}>
+            <button
+              key={p.id}
+              className="btn btn-sm plan-pick"
+              aria-pressed={shown === p.id}
+              onClick={() => setOpen(p.id)}
+            >
               {p.number} · {p.title} <DentalStatus value={p.status} />
             </button>
           ))}
@@ -98,6 +103,11 @@ export function PlanList({
         )}
       </div>
       {list.length === 0 && <Empty>{t("dental.no_plans", "No treatment plans yet.")}</Empty>}
+      {list.length > 0 && !shown && (
+        <p className="small muted">
+          {t("dental.pick_plan", "All plans are finished. Choose one above to see it, or start a new plan.")}
+        </p>
+      )}
       {shown && <PlanDetail key={shown} planId={shown} encounterId={encounterId} diagnoses={diagnoses} />}
       <Modal open={creating} title={t("dental.new_plan", "New treatment plan")} onClose={() => setCreating(false)}>
         <form
@@ -487,6 +497,7 @@ export function PlanDetail({
   diagnoses?: DentalDiagnosis[];
 }) {
   const { t } = useTranslation();
+  const priorities = useDentalCatalog().data?.plan_item_priorities ?? [];
   const { can } = useAuth();
   const plan = useGet<TreatmentPlan>(["dental", "plan", planId], `/dental/plans/${planId}/`);
   const revisions = useGet<
@@ -619,7 +630,7 @@ export function PlanDetail({
                   {i.cancel_reason && <div className="small subtle">{i.cancel_reason}</div>}
                 </td>
                 <td className="mono">{i.location.label}</td>
-                <td>{i.priority}</td>
+                <td>{priorities.find(([k]) => k === i.priority)?.[1] ?? i.priority}</td>
                 <td>
                   {i.sessions_done}/{i.sessions_planned}
                 </td>

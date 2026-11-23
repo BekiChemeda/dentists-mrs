@@ -26,6 +26,7 @@ import {
 import { formatDateTime, formatDay } from "../../lib/format";
 import { ChartView } from "./ChartView";
 import { DentalStatus, useDentalCatalog } from "./common";
+import { sexAge } from "../common";
 import { ImagesPanel } from "./Images";
 import { OrthoPanel } from "./Ortho";
 import { PerioHistory } from "./Perio";
@@ -85,7 +86,7 @@ export function DentalPatientPage() {
     <div className="stack">
       <PageHead
         title={`${t("dental.dental_record", "Dental record")} · ${name}`}
-        sub={patient.data && `MRN ${patient.data.mrn} · ${patient.data.sex}, ${patient.data.age}`}
+        sub={patient.data && `MRN ${patient.data.mrn} · ${sexAge(patient.data, t)}`}
         actions={
           <>
             {can("dental.labcase.manage") && moduleOn("dental_lab") && (

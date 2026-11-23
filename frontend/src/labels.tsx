@@ -80,6 +80,12 @@ const SETS = {
   approval: APPROVAL,
 };
 
+/** Plain-text label for a state (for <option> elements, where a badge cannot go). */
+export function useStateLabel(): (set: keyof typeof SETS, value: string) => string {
+  const { t } = useTranslation();
+  return (set, value) => t(`state.${set}.${value}`, SETS[set][value]?.[0] ?? value);
+}
+
 export function StateBadge({ set, value }: { set: keyof typeof SETS; value: string }) {
   const { t } = useTranslation();
   const [label, tone] = SETS[set][value] ?? [value, "muted" as BadgeTone];

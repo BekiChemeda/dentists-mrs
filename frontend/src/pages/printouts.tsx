@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Printer } from "lucide-react";
 import type { Encounter, LabOrder, Patient } from "../api/types";
-import { formatDateTime } from "../lib/format";
+import { formatDateTime, formatDay } from "../lib/format";
 import { printElement } from "../ui";
 import { ClinicHeader, DocFooter, Ec, logoSrc, sexAge, useClinic } from "./common";
 
@@ -29,7 +29,7 @@ export function PatientCard({ patient: p }: { patient: Patient }) {
           </div>
           <div className="patient-card-name">{p.full_name}</div>
           <div className="small">
-            {sexAge(p, t)}, {t("patients.born", "Born")} {p.birth_date}
+            {sexAge(p, t)}, {t("patients.born", "Born")} {formatDay(p.birth_date)}
           </div>
           {p.blood_group && (
             <div className="small">
