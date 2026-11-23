@@ -66,7 +66,7 @@ def dispense(ctx: ActorContext, rx_item: PrescriptionItem, *, quantity: Decimal,
              override_approval_id=None, notes: str = "", batch_id=None, batch_reason: str = "",
              special_form_checked: bool = False, counselling_given: bool = False) -> Dispensation:
     rx_item = PrescriptionItem.objects.select_for_update(of=("self",)).select_related("prescription", "item").get(pk=rx_item.pk)
-    rx = Prescription.objects.select_for_update().select_related("encounter").get(pk=rx_item.prescription_id)
+    rx = Prescription.objects.select_for_update(of=("self",)).get(pk=rx_item.prescription_id)
     if rx.status not in Prescription.OPEN:
         raise ConflictError(f"This prescription is {rx.get_status_display().lower()}.")
     remaining = rx_item.quantity - rx_item.quantity_dispensed

@@ -10,6 +10,13 @@ set -euo pipefail
 BACKUP_DIR="$(mktemp -d)"
 export BACKUP_DIR
 export BACKUP_COPY_DIR="" MRS_RESTORE_CONFIRM=yes MRS_SKIP_PRE_RESTORE_BACKUP=yes STOP_API=true START_API=true
+# Dental image files: a synthetic image directory, mirrored by backup.sh and put back by restore.sh.
+IMAGE_DIR="$(mktemp -d)"
+export IMAGE_DIR MRS_SKIP_IMAGE_VERIFY=yes IMAGE_OWNER="$(id -u):$(id -g)"
+mkdir -p "$IMAGE_DIR/ab"
+printf 'synthetic radiograph bytes' > "$IMAGE_DIR/ab/abc123.png"
+printf 'partial' > "$IMAGE_DIR/ab/.abc124.png.partial"
+image_sum="$(sha256sum "$IMAGE_DIR/ab/abc123.png" | awk '{print $1}')"
 here="$(dirname "$0")"
 POSTGRES_DB="${POSTGRES_DB:-mrs}"; POSTGRES_USER="${POSTGRES_USER:-mrs}"
 q() { $DB_EXEC psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "$1"; }
@@ -20,6 +27,10 @@ before_audit="$(q 'SELECT count(*) FROM audit_event')"
 file="$("$here/backup.sh" manual | tail -n 1)"
 [[ -s "$file" && -s "$file.sha256" ]] || { echo "FAIL: backup file or checksum missing"; exit 1; }
 "$here/verify-backup.sh" "$file"
+
+[[ -f "$BACKUP_DIR/images/ab/abc123.png" ]] || { echo "FAIL: dental image not mirrored into the backup"; exit 1; }
+[[ ! -e "$BACKUP_DIR/images/ab/.abc124.png.partial" ]] || { echo "FAIL: unfinished upload copied"; exit 1; }
+rm -f "$IMAGE_DIR/ab/abc123.png"  # lost after the backup: restore must bring it back
 
 # Change data after the backup; the restore must undo it.
 q "INSERT INTO accounts_user (id, password, username, first_name, last_name, email, phone, job_title,
@@ -40,6 +51,8 @@ fi
 [[ "$(q "SELECT count(*) FROM accounts_user WHERE username='restore.marker'")" == "0" ]] \
     || { echo "FAIL: post-backup change survived restore"; exit 1; }
 [[ "$(q 'SELECT count(*) FROM accounts_user')" == "$before_users" ]] || { echo "FAIL: user count differs"; exit 1; }
+[[ "$(sha256sum "$IMAGE_DIR/ab/abc123.png" 2>/dev/null | awk '{print $1}')" == "$image_sum" ]] \
+    || { echo "FAIL: dental image not restored intact"; exit 1; }
 [[ "$(q 'SELECT count(*) FROM audit_event')" == "$before_audit" ]] || { echo "FAIL: audit count differs"; exit 1; }
 [[ "$(q "SELECT count(*) FROM pg_trigger WHERE tgname='audit_event_no_update'")" == "1" ]] \
     || { echo "FAIL: audit trigger missing after restore"; exit 1; }
@@ -62,10 +75,18 @@ enc_src="$("$here/backup.sh" manual | tail -n 1)"
 enc="$BACKUP_COPY_DIR/$(basename "$enc_src").enc"
 [[ -s "$enc" && ! -e "$BACKUP_COPY_DIR/$(basename "$enc_src")" ]] || { echo "FAIL: external copy not encrypted"; exit 1; }
 ! grep -qa "accounts_user" "$enc" || { echo "FAIL: encrypted copy contains readable data"; exit 1; }
+[[ -s "$BACKUP_COPY_DIR/images/ab/abc123.png.enc" && ! -e "$BACKUP_COPY_DIR/images/ab/abc123.png" ]] \
+    || { echo "FAIL: dental images on the external drive are not encrypted"; exit 1; }
+! grep -qa "synthetic radiograph" "$BACKUP_COPY_DIR/images/ab/abc123.png.enc" || { echo "FAIL: readable image"; exit 1; }
+rm -f "$IMAGE_DIR/ab/abc123.png"
+MRS_RESTORE_IMAGES_FROM="$BACKUP_COPY_DIR/images" "$here/restore.sh" "$enc" >/dev/null 2>&1 \
+    || { echo "FAIL: restore with encrypted images"; exit 1; }
+[[ "$(sha256sum "$IMAGE_DIR/ab/abc123.png" | awk '{print $1}')" == "$image_sum" ]] \
+    || { echo "FAIL: encrypted image not restored intact"; exit 1; }
 "$here/restore.sh" "$enc" >/dev/null 2>&1 || { echo "FAIL: restore from encrypted copy"; exit 1; }
 printf 'wrong phrase\n' | BACKUP_COPY_KEY_FILE=/nonexistent "$here/restore.sh" "$enc" >/dev/null 2>&1 \
     && { echo "FAIL: wrong phrase accepted"; exit 1; }
 rm -rf "$BACKUP_COPY_DIR" "$BACKUP_COPY_KEY_FILE"
 
-rm -rf "$BACKUP_DIR"
-echo "PASS: backup, verification, corrupt-file rejection, restore, rotation and encrypted external copy all behaved correctly"
+rm -rf "$BACKUP_DIR" "$IMAGE_DIR"
+echo "PASS: backup, verification, corrupt-file rejection, restore (database and dental images), rotation and encrypted external copy all behaved correctly"

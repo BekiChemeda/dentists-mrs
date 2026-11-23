@@ -53,6 +53,37 @@ $DB_EXEC createdb -U "$POSTGRES_USER" "$POSTGRES_DB"
 $DB_EXEC pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --exit-on-error < "$file" \
     || die "pg_restore failed. The database may be incomplete; restore the safety backup in $BACKUP_DIR/manual."
 
+# Dental image files: copy back any missing from the backup mirror (or MRS_RESTORE_IMAGES_FROM, e.g. an
+# off-site download or the external drive, whose files end in .enc and are decrypted with the key or phrase).
+images_from="${MRS_RESTORE_IMAGES_FROM:-$BACKUP_DIR/images}"
+if [[ -d "$images_from" ]]; then
+    mkdir -p "$IMAGE_DIR"
+    restored=0
+    while IFS= read -r -d '' f; do
+        f="${f#./}"; target="$IMAGE_DIR/${f%.enc}"
+        [[ -e "$target" ]] && continue
+        mkdir -p "$(dirname "$target")"
+        if [[ "$f" == *.enc ]]; then
+            [[ -r "$BACKUP_COPY_KEY_FILE" ]] || die "Encrypted image copies need the key file $BACKUP_COPY_KEY_FILE"
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -pass "file:$BACKUP_COPY_KEY_FILE" \
+                -in "$images_from/$f" -out "$target" 2>/dev/null || die "Could not decrypt $f"
+        else
+            cp -p "$images_from/$f" "$target"
+        fi
+        chmod 600 "$target"
+        restored=$((restored + 1))
+    done < <(cd "$images_from" && find . -type f ! -name '.*' -print0)
+    chown -R "${IMAGE_OWNER:-10001:10001}" "$IMAGE_DIR" 2>/dev/null || true
+    log "Dental images: $restored file(s) restored into $IMAGE_DIR"
+else
+    log "No dental image mirror at $images_from (nothing to restore for images)"
+fi
+
 log "Starting application containers"
 $START_API
+VERIFY_IMAGES="${VERIFY_IMAGES:-docker compose exec -T api python manage.py verify_dental_images}"
+if [[ "${MRS_SKIP_IMAGE_VERIFY:-}" != "yes" ]]; then
+    sleep "${RESTORE_SETTLE_SECONDS:-5}"
+    $VERIFY_IMAGES || log "WARNING: some dental image files are missing or damaged (see above). Restore them from another copy."
+fi
 log "Restore complete from $file"

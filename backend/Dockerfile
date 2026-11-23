@@ -11,7 +11,8 @@ RUN apt-get update \
     && apt-get upgrade -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-RUN groupadd --system mrs && useradd --system --gid mrs --home /app mrs
+# Fixed uid/gid so the host's dental image directory can be owned by it (deploy/install.sh).
+RUN groupadd --system --gid 10001 mrs && useradd --system --uid 10001 --gid mrs --home /app mrs
 
 WORKDIR /app
 COPY requirements.txt .

@@ -1,4 +1,4 @@
-# Clinic MRS — single-server deployment (Ubuntu Server 24.04 LTS).
+# Dental MRS (on the Clinic MRS platform) — single-server deployment (Ubuntu Server 24.04 LTS).
 # Only the `web` service is published to the clinic LAN. `api` and `db` sit on an
 # internal network with no published ports.
 
@@ -49,10 +49,13 @@ services:
       POSTGRES_PORT: "5432"
       # The System page reads backup dates and sizes from here (read-only; it never restores).
       BACKUP_DIR: /var/backups/mrs
+      DENTAL_IMAGE_ROOT: /var/lib/mrs/images
       MRS_VERSION: ${MRS_VERSION:-}
       PAYMENTS_EGRESS_PROXY: http://egress:3128
     volumes:
       - ${BACKUP_DIR:-/var/backups/mrs}:/var/backups/mrs:ro
+      # Dental image files (ADR 0007): the only writable host directory. Never served by nginx directly.
+      - ${IMAGE_DIR:-/var/lib/mrs/images}:/var/lib/mrs/images
     # The application cannot change its own code or gain privileges, even if a bug is exploited.
     read_only: true
     tmpfs: ["/tmp"]

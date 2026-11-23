@@ -180,7 +180,19 @@ def health_snapshot() -> dict:
         "locked_accounts": User.objects.filter(locked_until__gt=now).count(),
         "maintenance_mode": settings_obj.maintenance_mode,
         "offsite": off,
+        "dental_images": _dental_images(),
     }
+
+
+def _dental_images() -> dict:
+    """Dental image storage (ADR 0007): totals from the database, free space where the files live."""
+    from django.db.models import Count, Sum
+
+    from apps.dental.models import DentalImage
+
+    agg = DentalImage.objects.aggregate(files=Count("id"), bytes=Sum("size_bytes"))
+    return {"files": agg["files"] or 0, "bytes": agg["bytes"] or 0, "path": str(settings.DENTAL_IMAGE_ROOT),
+            "disk": _disk(str(settings.DENTAL_IMAGE_ROOT)) if settings.DENTAL_IMAGE_ROOT.exists() else None}
 
 
 # ---------------------------------------------------------------------------

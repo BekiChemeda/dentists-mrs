@@ -28,6 +28,12 @@ sha256_of "$file" > "$file.sha256"
 size="$(du -h "$file" | cut -f1)"
 log "Backup complete: $file ($size)"
 
+# Dental image files: mirrored (they never change), so the mirror only grows by the new images.
+if [[ -d "$IMAGE_DIR" ]]; then
+    copied="$(mirror_images "$IMAGE_DIR" "$BACKUP_DIR/images")" || die "Copying dental images to the backup failed"
+    log "Dental images: $copied new file(s) copied to $BACKUP_DIR/images"
+fi
+
 # Weekly copy every Sunday.
 if [[ "$label" == "daily" && "$(date +%u)" == "7" ]]; then
     cp -p "$file" "$file.sha256" "$BACKUP_DIR/weekly/"
@@ -48,6 +54,17 @@ if [[ -n "$BACKUP_COPY_DIR" ]]; then
             log "WARNING: BACKUP_COPY_ENCRYPT=yes but no key at $BACKUP_COPY_KEY_FILE; external copy skipped"
         else
             cp -p "$file" "$file.sha256" "$BACKUP_COPY_DIR/" && log "Copied (NOT encrypted) to $BACKUP_COPY_DIR"
+        fi
+        if [[ -d "$IMAGE_DIR" ]]; then
+            if [[ "$BACKUP_COPY_ENCRYPT" != "no" && -r "$BACKUP_COPY_KEY_FILE" ]]; then
+                n="$(mirror_images "$IMAGE_DIR" "$BACKUP_COPY_DIR/images" "$BACKUP_COPY_KEY_FILE")" \
+                    && log "Dental images: $n new encrypted file(s) on the external drive" \
+                    || log "WARNING: copying dental images to the external drive failed"
+            elif [[ "$BACKUP_COPY_ENCRYPT" != "yes" ]]; then
+                n="$(mirror_images "$IMAGE_DIR" "$BACKUP_COPY_DIR/images")" \
+                    && log "Dental images: $n new file(s) on the external drive (NOT encrypted)" \
+                    || log "WARNING: copying dental images to the external drive failed"
+            fi
         fi
     else
         log "WARNING: BACKUP_COPY_DIR '$BACKUP_COPY_DIR' is not mounted or not writable; external copy skipped"

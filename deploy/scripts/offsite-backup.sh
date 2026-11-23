@@ -148,7 +148,10 @@ cmd_run() {
     fi
 
     set +e
-    out="$($RESTIC backup --json --quiet --host "$OFFSITE_HOST_TAG" --tag mrs --tag offsite "$file" 2>&1)"
+    local paths=("$file")
+    [[ -d "$IMAGE_DIR" ]] && paths+=("$IMAGE_DIR")  # restic sends only images it has not stored before
+    out="$($RESTIC backup --json --quiet --host "$OFFSITE_HOST_TAG" --tag mrs --tag offsite --exclude '.*.partial' \
+        "${paths[@]}" 2>&1)"
     rc=$?
     set -e
     if (( rc != 0 )); then
@@ -208,6 +211,10 @@ cmd_restore() {
     $DB_EXEC pg_restore --list < "$dump" > /dev/null || die "The downloaded file is damaged"
     sha256_of "$dump" > "$dump.sha256"
     log "Downloaded and checked: $dump"
+    if [[ -d "$dest$IMAGE_DIR" ]]; then
+        log "Dental images downloaded to $dest$IMAGE_DIR"
+        export MRS_RESTORE_IMAGES_FROM="$dest$IMAGE_DIR"
+    fi
     if [[ -n "$import" ]]; then
         "$(dirname "$0")/restore.sh" "$dump"
     else

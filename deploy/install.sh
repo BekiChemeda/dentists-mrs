@@ -304,6 +304,11 @@ start_application() {
         run docker compose build
         ok "Images built"
     fi
+    # Dental image files live on the host, writable only by the application's user inside the container (uid 10001).
+    local image_dir; image_dir=$(env_value IMAGE_DIR); image_dir="${image_dir:-/var/lib/mrs/images}"
+    run mkdir -p "$image_dir"
+    run chown 10001:10001 "$image_dir"
+    run chmod 700 "$image_dir"
     run docker compose up -d db
     local i
     for i in $(seq 1 60); do
@@ -340,8 +345,11 @@ first_data() {
     yes_no MRS_LOAD_CATALOG "Load the starter catalogue (example services, laboratory tests and medicines, no stock)?" yes
     if [[ "$MRS_LOAD_CATALOG" == yes ]]; then
         run docker compose exec -T api python manage.py load_starter_catalog
-        ok "Starter catalogue loaded. Review every price before use."
+        run docker compose exec -T api python manage.py load_dental_catalog
+        ok "Starter catalogue loaded (including dental procedures at price 0). Review every price before use."
     fi
+    # A new dental clinic starts without triage, laboratory and pharmacy (switch them on in System > Modules).
+    run docker compose exec -T api python manage.py apply_dental_defaults
 }
 
 # --------------------------------------------------------------------------- 7. scheduled jobs
