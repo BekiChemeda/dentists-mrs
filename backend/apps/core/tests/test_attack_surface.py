@@ -98,3 +98,26 @@ def test_login_without_csrf_token_is_refused():
 def test_error_responses_do_not_leak_internals():
     r = APIClient().get("/api/v1/does-not-exist/")
     assert b"Traceback" not in r.content and b"settings" not in r.content.lower()
+
+
+# Reachable by any signed-in account, even one with no role: its own account, clinic reference data
+# and lists that are filtered to what the user may see. None of these return patient records.
+SELF_SERVICE = {"api/v1/announcements/current/", "api/v1/approvals/", "api/v1/auth/me/", "api/v1/auth/mfa/",
+                "api/v1/auth/sessions/", "api/v1/departments/", "api/v1/notifications/", "api/v1/reports/",
+                "api/v1/rooms/", "api/v1/settings/clinic/", "api/v1/system/modules/"}
+
+
+def test_signed_in_account_without_a_role_sees_no_records(make_user):
+    """A new endpoint that checks only "is signed in" (and not a permission) fails here."""
+    client = APIClient()
+    client.force_authenticate(make_user())
+    reachable = set()
+    for path in ROUTES:
+        if path in PUBLIC:
+            continue
+        if client.get("/" + path).status_code not in (401, 403, 404, 405):
+            reachable.add(path)
+    assert reachable <= SELF_SERVICE, sorted(reachable - SELF_SERVICE)
+    for path in ("api/v1/approvals/", "api/v1/reports/"):
+        body = client.get("/" + path).json()
+        assert (body.get("results") if isinstance(body, dict) else body) == []
