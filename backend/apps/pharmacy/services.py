@@ -113,7 +113,7 @@ def dispense(ctx: ActorContext, rx_item: PrescriptionItem, *, quantity: Decimal,
     done = all(line.quantity_dispensed >= line.quantity for line in lines)
     rx.status = Prescription.Status.DISPENSED if done else Prescription.Status.PARTIAL
     rx.save(update_fields=["status", "updated_at"])
-    visit_event(ctx, rx.encounter.visit_id, "pharmacy.dispense",
+    visit_event(ctx, rx.visit_id, "pharmacy.dispense",
                 f"Dispensed {quantity.normalize():f} × {item}" + (" (stock override)" if override else ""))
     record_event(ctx, action="pharmacy.dispense", object_type="dispensation", object_id=dispensation.pk,
                  details={"patient": str(rx.patient_id), "item": item.code, "quantity": str(quantity),

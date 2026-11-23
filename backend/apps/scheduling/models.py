@@ -7,6 +7,37 @@ from apps.patients.models import Patient
 from apps.core.concurrency import Versioned
 
 
+class AppointmentType(Versioned, TimestampedModel):
+    """
+    What an appointment is for (new patient examination, root canal session, crown fitting...). Sets the
+    default length and chair. Managed by the clinic; never hard-coded. Prices live in the procedure catalogue.
+    """
+
+    class Category(models.TextChoices):
+        CONSULTATION = "consultation", "Consultation or examination"
+        PROCEDURE = "procedure", "Planned procedure"
+        REVIEW = "review", "Follow-up or review"
+        IMAGING = "imaging", "Imaging"
+
+    code = models.SlugField(max_length=40, unique=True)
+    name = models.CharField(max_length=100, unique=True)
+    category = models.CharField(max_length=12, choices=Category.choices)
+    default_minutes = models.PositiveSmallIntegerField(default=30)
+    default_room = models.ForeignKey("accounts.Room", null=True, blank=True, on_delete=models.PROTECT,
+                                     related_name="+")
+    is_active = models.BooleanField(default=True)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        db_table = "scheduling_appointment_type"
+        ordering = ["sort_order", "name"]
+        constraints = [models.CheckConstraint(condition=Q(default_minutes__gte=5, default_minutes__lte=240),
+                                              name="appt_type_minutes_range")]
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class Appointment(TimestampedModel):
     class Status(models.TextChoices):
         SCHEDULED = "scheduled", "Scheduled"
@@ -36,6 +67,11 @@ class Appointment(TimestampedModel):
     # Set when a doctor books this as a follow-up from a consultation.
     source_encounter = models.ForeignKey("clinical.Encounter", null=True, blank=True, on_delete=models.PROTECT,
                                          related_name="follow_up_appointments")
+    appointment_type = models.ForeignKey(AppointmentType, null=True, blank=True, on_delete=models.PROTECT,
+                                         related_name="appointments")
+    # The chair or treatment room booked. Two active appointments may not overlap on the same room.
+    room = models.ForeignKey("accounts.Room", null=True, blank=True, on_delete=models.PROTECT,
+                             related_name="appointments")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
 
     class Meta:
@@ -44,6 +80,7 @@ class Appointment(TimestampedModel):
         indexes = [
             models.Index(fields=["scheduled_date", "doctor"], name="appt_day_doctor_idx"),
             models.Index(fields=["patient", "-scheduled_at"], name="appt_patient_idx"),
+            models.Index(fields=["scheduled_date", "room"], name="appt_day_room_idx"),
         ]
         constraints = [
             # One active appointment per patient per day: prevents accidental double booking.

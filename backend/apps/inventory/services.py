@@ -61,7 +61,7 @@ def expiring_batches(days: int = 90):
 # ---------------------------------------------------------------------------
 ITEM_FIELDS = ("code", "name", "generic_name", "brand_name", "category", "dosage_form", "strength", "unit", "route",
                "therapeutic_category", "controlled_class", "allergy_groups", "warnings", "default_supplier",
-               "reorder_level", "selling_price", "is_active")
+               "reorder_level", "selling_price", "is_active", "pack_unit", "units_per_pack")
 
 
 @transaction.atomic

@@ -61,6 +61,21 @@ PERMISSIONS: dict[str, tuple[str, str]] = {
     "reports.financial": ("reports", "View financial reports"),
     "reports.export": ("reports", "Export reports to CSV/PDF"),
     "reports.staff": ("reports", "View staff activity reports"),
+    # Dental (apps/dental). Reports, prescriptions, billing and stock reuse the shared permissions above.
+    "dental.view": ("dental", "View dental examinations, chart, periodontal charts, diagnoses, plans and procedures"),
+    "dental.write": ("dental", "Write and sign dental examinations, diagnoses and medical risk reviews"),
+    "dental.chart.record": ("dental", "Record tooth findings and periodontal measurements in an open examination"),
+    "dental.amend": ("dental", "Amend signed dental records and mark chart entries as entered in error"),
+    "dental.plan.manage": ("dental", "Create, present and revise treatment plans and record the patient's decision"),
+    "dental.procedure.record": ("dental", "Prepare procedure records and the materials used"),
+    "dental.procedure.sign": ("dental", "Sign procedure records you performed"),
+    "dental.imaging.view": ("dental", "View dental images"),
+    "dental.imaging.upload": ("dental", "Upload dental images"),
+    "dental.imaging.manage": ("dental", "Correct dental image details and withdraw images uploaded in error"),
+    "dental.labcase.manage": ("dental", "Send work to the dental laboratory and follow it up"),
+    "dental.labcase.work": ("dental", "Work on dental laboratory cases assigned to you"),
+    "dental.catalog.manage": ("dental", "Maintain dental procedures and prices, findings, diagnoses and appointment types"),
+    "dental.recall.manage": ("dental", "Manage follow-ups and recalls"),
 }
 
 ROLES: dict[str, tuple[str, str, list[str]]] = {
@@ -84,7 +99,8 @@ ROLES: dict[str, tuple[str, str, list[str]]] = {
          "patients.export", "appointments.view", "appointments.manage", "queue.manage",
          "lab.catalog.manage", "medicines.manage", "pharmacy.dispense.override", "inventory.view",
          "inventory.adjust", "billing.view", "billing.discount.approve", "billing.void.approve",
-         "reports.operational", "reports.clinical", "reports.financial", "reports.export", "reports.staff"],
+         "reports.operational", "reports.clinical", "reports.financial", "reports.export", "reports.staff",
+         "dental.catalog.manage"],
     ),
     "clinic_director": (
         "Clinic director",
@@ -100,7 +116,7 @@ ROLES: dict[str, tuple[str, str, list[str]]] = {
         "Registration, appointments, queue and invoicing.",
         ["patients.view", "patients.create", "patients.update", "appointments.view",
          "appointments.manage", "queue.manage", "billing.view", "billing.invoice",
-         "reports.operational"],
+         "reports.operational", "dental.recall.manage"],
     ),
     "doctor": (
         "Doctor",
@@ -145,6 +161,40 @@ ROLES: dict[str, tuple[str, str, list[str]]] = {
         "Stock, suppliers and purchases.",
         ["medicines.manage", "inventory.view", "inventory.manage", "inventory.adjust",
          "reports.operational"],
+    ),
+    "dentist": (
+        "Dentist",
+        "Dental examinations, chart, diagnoses, treatment plans, procedures, prescriptions and images.",
+        ["patients.view", "patients.create", "patients.update", "patients.status", "appointments.view",
+         "appointments.manage", "queue.manage", "dental.view", "dental.write", "dental.chart.record", "dental.amend",
+         "dental.plan.manage", "dental.procedure.record", "dental.procedure.sign", "prescriptions.create",
+         "dental.imaging.view", "dental.imaging.upload", "dental.imaging.manage", "dental.labcase.manage",
+         "dental.recall.manage", "pharmacy.view", "reports.operational", "reports.clinical"],
+    ),
+    "dental_assistant": (
+        "Dental assistant",
+        "Chairside work: records findings the dentist calls out, prepares procedure records and materials, uploads "
+        "images. Cannot sign diagnoses, plans or procedures.",
+        ["patients.view", "appointments.view", "queue.manage", "dental.view", "dental.chart.record",
+         "dental.procedure.record", "dental.imaging.view", "dental.imaging.upload"],
+    ),
+    "dental_hygienist": (
+        "Dental hygienist",
+        "Preventive and periodontal work within the clinic's approved scope: charting, periodontal measurements, "
+        "signing own procedures, recalls.",
+        ["patients.view", "appointments.view", "queue.manage", "dental.view", "dental.chart.record",
+         "dental.procedure.record", "dental.procedure.sign", "dental.imaging.view", "dental.recall.manage"],
+    ),
+    "dental_technician": (
+        "Dental technician",
+        "Dental laboratory work assigned to them (crowns, bridges, dentures). Sees the patient's name and MRN only.",
+        ["dental.labcase.work"],
+    ),
+    "imaging_staff": (
+        "Imaging staff",
+        "Takes and uploads dental images and corrects their details.",
+        ["patients.view", "appointments.view", "dental.imaging.view", "dental.imaging.upload",
+         "dental.imaging.manage"],
     ),
 }
 
@@ -198,6 +248,12 @@ ROLE_CHANGES_0013 = {"system_admin": {"add": ["payments.gateway.manage"]}}
 ROLE_CHANGES_0012 = {
     "system_admin": {"add": ["devices.manage"]},
     "clinic_admin": {"add": ["devices.manage"]},
+}
+
+# Added in migration 0014 (Dental MRS): dental duties for the shared built-in roles.
+ROLE_CHANGES_0014 = {
+    "receptionist": {"add": ["dental.recall.manage"]},
+    "clinic_admin": {"add": ["dental.catalog.manage"]},
 }
 
 ROLE_CHANGES_0010 = {

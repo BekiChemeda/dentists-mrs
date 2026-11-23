@@ -113,12 +113,13 @@ class PrescriptionSerializer(serializers.ModelSerializer):
     items = PrescriptionItemSerializer(many=True, read_only=True)
     prescriber = UserBrief(read_only=True)
     patient = PatientBrief(read_only=True)
-    visit_id = serializers.UUIDField(source="encounter.visit_id", read_only=True)
+    visit_id = serializers.UUIDField(read_only=True)
     prescriber_details = ClinicianBrief(source="prescriber", read_only=True)
 
     class Meta:
         model = Prescription
-        fields = ["id", "number", "encounter", "visit_id", "patient", "prescriber", "prescriber_details", "status",
+        fields = ["id", "number", "encounter", "dental_encounter", "visit_id", "patient", "prescriber",
+                  "prescriber_details", "status",
                   "notes", "cancel_reason",
                   "controlled_class", "special_form_serial", "patient_weight_kg", "created_at", "items"]
 

@@ -29,21 +29,24 @@ def _hm(dt) -> str:
 
 
 def doctors():
-    return (User.objects.filter(is_active=True, roles__permissions__code="clinical.write")
+    """Staff who see patients: medical doctors and dentists."""
+    from apps.core.modules import CLINICIAN_PERMISSIONS
+
+    return (User.objects.filter(is_active=True, roles__permissions__code__in=CLINICIAN_PERMISSIONS)
             .distinct().order_by("first_name", "last_name"))
 
 
 def _require_doctor(user: User | None) -> None:
     if user is not None and not doctors().filter(pk=user.pk).exists():
         raise BusinessValidationError("The selected staff member cannot see patients.",
-                                      fields={"doctor_id": ["Choose a doctor."]})
+                                      fields={"doctor_id": ["Choose a doctor or dentist."]})
 
 
 # ---------------------------------------------------------------------------
 # Appointments
 # ---------------------------------------------------------------------------
 @transaction.atomic
-def _check_slot(*, doctor, patient, scheduled_at, duration_minutes, exclude_id=None) -> datetime.date:
+def _check_slot(*, doctor, patient, scheduled_at, duration_minutes, exclude_id=None, room=None) -> datetime.date:
     if scheduled_at < timezone.now() - datetime.timedelta(minutes=5):
         raise BusinessValidationError("Appointments cannot be booked in the past.",
                                       fields={"scheduled_at": ["Choose a future time."]})
@@ -67,6 +70,18 @@ def _check_slot(*, doctor, patient, scheduled_at, duration_minutes, exclude_id=N
             raise ConflictError(
                 f"Dr. {doctor.full_name} already has an appointment at "
                 f"{timezone.localtime(other.scheduled_at):%H:%M}.", fields={"scheduled_at": ["Slot taken."]})
+    if room is not None:
+        if not room.is_active:
+            raise BusinessValidationError("This chair or room is no longer in use.", fields={"room_id": ["Inactive."]})
+        chair = Appointment.objects.select_for_update().filter(room=room, scheduled_date=local_date,
+                                                               status__in=Appointment.ACTIVE)
+        if exclude_id:
+            chair = chair.exclude(pk=exclude_id)
+        for other in chair:
+            other_end = other.scheduled_at + datetime.timedelta(minutes=other.duration_minutes)
+            if other.scheduled_at < end and other_end > scheduled_at:
+                raise ConflictError(f"{room.name} is already booked at {timezone.localtime(other.scheduled_at):%H:%M}.",
+                                    fields={"room_id": ["Chair taken."]})
     others = Appointment.objects.filter(patient=patient, scheduled_date=local_date, status__in=Appointment.ACTIVE)
     if exclude_id:
         others = others.exclude(pk=exclude_id)
@@ -78,8 +93,8 @@ def _check_slot(*, doctor, patient, scheduled_at, duration_minutes, exclude_id=N
 
 @transaction.atomic
 def book_appointment(ctx: ActorContext, *, patient, doctor, scheduled_at: datetime.datetime,
-                     duration_minutes: int = 15, reason: str = "", notes: str = "", service=None,
-                     source_encounter=None) -> Appointment:
+                     duration_minutes: int | None = None, reason: str = "", notes: str = "", service=None,
+                     source_encounter=None, appointment_type=None, room=None) -> Appointment:
     from apps.patients.services import require_active
 
     require_active(patient)
@@ -88,19 +103,29 @@ def book_appointment(ctx: ActorContext, *, patient, doctor, scheduled_at: dateti
         raise BusinessValidationError("Choose a doctor.", fields={"doctor_id": ["Required."]})
     if service is not None and not service.is_active:
         raise BusinessValidationError("This service is no longer offered.", fields={"service_id": ["Inactive."]})
+    if appointment_type is not None:
+        if not appointment_type.is_active:
+            raise BusinessValidationError("This appointment type is no longer used.",
+                                          fields={"appointment_type_id": ["Inactive."]})
+        duration_minutes = duration_minutes or appointment_type.default_minutes
+        room = room or appointment_type.default_room
+    duration_minutes = duration_minutes or 15
     local_date = _check_slot(doctor=doctor, patient=patient, scheduled_at=scheduled_at,
-                             duration_minutes=duration_minutes)
+                             duration_minutes=duration_minutes, room=room)
     try:
         with transaction.atomic():
             appt = Appointment.objects.create(patient=patient, doctor=doctor, scheduled_at=scheduled_at,
                                               scheduled_date=local_date, duration_minutes=duration_minutes,
                                               reason=reason.strip(), notes=notes.strip(), service=service,
-                                              source_encounter=source_encounter, created_by=ctx.user)
+                                              source_encounter=source_encounter, appointment_type=appointment_type,
+                                              room=room, created_by=ctx.user)
     except IntegrityError as exc:
         raise ConflictError("This patient already has an appointment on that day.") from exc
     record_event(ctx, action="appointment.book", object_type="appointment", object_id=appt.pk,
                  details={"patient": str(patient.pk), "doctor": doctor.username,
                           "at": timezone.localtime(scheduled_at).isoformat(),
+                          **({"type": appointment_type.code} if appointment_type else {}),
+                          **({"room": room.name} if room else {}),
                           **({"follow_up_of": str(source_encounter.pk)} if source_encounter else {})})
     if doctor != ctx.user:
         notify_user(doctor, kind="appointment", title=f"New appointment: {patient.full_name}",
@@ -123,17 +148,20 @@ def confirm_appointment(ctx: ActorContext, appt: Appointment) -> Appointment:
 
 @transaction.atomic
 def reschedule_appointment(ctx: ActorContext, appt: Appointment, *, scheduled_at: datetime.datetime,
-                           duration_minutes: int | None = None, doctor=None, reason: str = "") -> Appointment:
+                           duration_minutes: int | None = None, doctor=None, reason: str = "",
+                           room=...) -> Appointment:
     appt = Appointment.objects.select_for_update().get(pk=appt.pk)
     if appt.status not in Appointment.BOOKED:
         raise ConflictError("Only appointments that have not started can be rescheduled.")
     doctor = doctor or appt.doctor
     _require_doctor(doctor)
     duration = duration_minutes or appt.duration_minutes
+    room = appt.room if room is ... else room
     local_date = _check_slot(doctor=doctor, patient=appt.patient, scheduled_at=scheduled_at,
-                             duration_minutes=duration, exclude_id=appt.pk)
+                             duration_minutes=duration, exclude_id=appt.pk, room=room)
     old = {"at": timezone.localtime(appt.scheduled_at).isoformat(), "doctor": appt.doctor.username}
     appt.scheduled_at, appt.scheduled_date, appt.duration_minutes, appt.doctor = scheduled_at, local_date, duration, doctor
+    appt.room = room
     # A moved appointment needs confirming again.
     appt.status, appt.confirmed_at = Appointment.Status.SCHEDULED, None
     appt.reschedule_count += 1
@@ -200,7 +228,7 @@ def _create_visit(ctx, *, patient, kind, doctor=None, appointment=None, priority
 
 
 def _alert_emergency(ctx, visit: Visit) -> None:
-    for perm in ("triage.record", "clinical.write"):
+    for perm in ("triage.record", "clinical.write", "dental.write"):
         notify_permission_holders(perm, kind="emergency", title=f"EMERGENCY: {visit.patient.full_name}",
                                   body=f"Queue number {visit.queue_number}", link="/queue", exclude_user=ctx.user)
 
@@ -395,3 +423,29 @@ def return_to_queue(ctx: ActorContext, visit: Visit) -> Visit:
     record_event(ctx, action="queue.return", object_type="visit", object_id=visit.pk)
     visit_event(ctx, visit, "queue.return", "Returned to the queue")
     return visit
+
+
+# ---------------------------------------------------------------------------
+# Appointment types
+# ---------------------------------------------------------------------------
+@transaction.atomic
+def save_appointment_type(ctx: ActorContext, data: dict, *, appt_type=None, room=...):
+    from .models import AppointmentType
+
+    data = dict(data)
+    data.pop("row_version", None)
+    created = appt_type is None
+    if created:
+        if AppointmentType.objects.filter(code=data["code"]).exists():
+            raise ConflictError("An appointment type with this code exists.", fields={"code": ["Already used."]})
+        appt_type = AppointmentType(**data, default_room=None if room is ... else room)
+    else:
+        for key, value in data.items():
+            setattr(appt_type, key, value)
+        if room is not ...:
+            appt_type.default_room = room
+    appt_type.save()
+    record_event(ctx, action="appointment_type.create" if created else "appointment_type.update",
+                 object_type="appointment_type", object_id=appt_type.pk,
+                 details={"code": appt_type.code, "fields": sorted(data)})
+    return appt_type

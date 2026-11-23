@@ -58,11 +58,19 @@ def outstanding_for(visit: Visit) -> Outstanding:
     out = Outstanding()
     for enc in Encounter.objects.filter(visit=visit, status=Encounter.Status.DRAFT).select_related("doctor"):
         out.draft_notes.append(f"Unsigned consultation by Dr. {enc.doctor.full_name}")
+    from apps.dental.models import DentalEncounter, ProcedureRecord
+
+    for enc in DentalEncounter.objects.filter(visit=visit, status=DentalEncounter.Status.DRAFT).select_related("dentist"):
+        out.draft_notes.append(f"Unsigned dental examination by Dr. {enc.dentist.full_name}")
+    for rec in (ProcedureRecord.objects.filter(visit=visit, status=ProcedureRecord.Status.DRAFT)
+                .select_related("procedure", "performed_by")):
+        out.draft_notes.append(f"Unsigned procedure record: {rec.procedure.name} ({rec.location_label}), "
+                               f"{rec.performed_by.full_name}")
     for item in ([] if "laboratory" in off else LabOrderItem.objects.filter(order__visit=visit)
                  .exclude(status__in=[LabOrderItem.Status.VERIFIED, LabOrderItem.Status.CANCELLED])
                  .select_related("test")):
         out.lab_pending.append(f"{item.test.name}: {item.get_status_display().lower()}")
-    for rx in ([] if "pharmacy" in off else Prescription.objects.filter(encounter__visit=visit,
+    for rx in ([] if "pharmacy" in off else Prescription.objects.filter(visit=visit,
                                            status__in=[Prescription.Status.ACTIVE, Prescription.Status.PARTIAL])
                .prefetch_related("items")):
         for line in rx.items.all():
@@ -100,7 +108,8 @@ def complete_visit(ctx: ActorContext, visit: Visit, *, outcome: str, note: str =
 
     out = outstanding_for(visit)
     if out.blocking:
-        raise ConflictError("Sign or discard the open consultation note before completing the visit.",
+        raise ConflictError("Sign or discard the open consultation, examination or procedure record before completing "
+                            "the visit.",
                             extra={"outstanding": out.as_dict()})
     if out.any and not acknowledge_outstanding:
         raise ConflictError("Some services for this visit are not finished.", extra={"outstanding": out.as_dict()})
@@ -111,7 +120,7 @@ def complete_visit(ctx: ActorContext, visit: Visit, *, outcome: str, note: str =
     # Medicines the patient will not collect: close the prescription so it leaves the pharmacy worklist.
     closed_rx = 0
     for rx in Prescription.objects.select_for_update().filter(
-            encounter__visit=visit, status__in=[Prescription.Status.ACTIVE, Prescription.Status.PARTIAL]):
+            visit=visit, status__in=[Prescription.Status.ACTIVE, Prescription.Status.PARTIAL]):
         rx.status = Prescription.Status.NOT_COLLECTED
         rx.cancel_reason = f"Visit closed: {note}"[:255]
         rx.save(update_fields=["status", "cancel_reason", "updated_at"])

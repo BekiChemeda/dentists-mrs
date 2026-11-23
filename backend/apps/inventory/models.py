@@ -14,12 +14,24 @@ class Item(Versioned, TimestampedModel):
         SUPPLY = "supply", "Medical supply"
         CONSUMABLE = "consumable", "Consumable"
         REAGENT = "reagent", "Laboratory reagent"
+        # Dental supplies
+        RESTORATIVE = "restorative", "Restorative material"
+        ANAESTHETIC = "anaesthetic", "Anaesthetic supply"
+        ENDODONTIC = "endodontic", "Endodontic material"
+        IMPRESSION = "impression", "Impression material"
+        PROSTHETIC = "prosthetic", "Prosthetic material"
+        STERILISATION = "sterilisation", "Sterilisation supply"
+        INFECTION_CONTROL = "infection_control", "Infection-control supply"
+        # Reusable: counted in stock, but never recorded as consumed by a procedure.
+        INSTRUMENT = "instrument", "Instrument or reusable equipment"
+
+    REUSABLE = (Category.INSTRUMENT,)
 
     code = models.CharField(max_length=30, unique=True)
     name = models.CharField(max_length=150)
     generic_name = models.CharField(max_length=150, blank=True)
     brand_name = models.CharField(max_length=150, blank=True)
-    category = models.CharField(max_length=12, choices=Category.choices)
+    category = models.CharField(max_length=20, choices=Category.choices)
     class Controlled(models.TextChoices):
         NONE = "", "Not controlled"
         PSYCHOTROPIC = "psychotropic", "Psychotropic"
@@ -37,6 +49,9 @@ class Item(Versioned, TimestampedModel):
     default_supplier = models.ForeignKey("Supplier", null=True, blank=True, on_delete=models.SET_NULL,
                                          related_name="+")
     unit = models.CharField(max_length=20, default="unit")  # dispensing / counting unit
+    # Package conversion: e.g. pack_unit "box", units_per_pack 50 -> one box is 50 units. Stock is always in units.
+    pack_unit = models.CharField(max_length=20, blank=True)
+    units_per_pack = models.DecimalField(max_digits=10, decimal_places=3, null=True, blank=True)
     reorder_level = models.DecimalField(max_digits=12, decimal_places=3, default=0)
     selling_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     tax_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)  # percent; see billing ServicePrice
@@ -49,6 +64,8 @@ class Item(Versioned, TimestampedModel):
         constraints = [
             models.CheckConstraint(condition=Q(reorder_level__gte=0), name="item_reorder_nonneg"),
             models.CheckConstraint(condition=Q(selling_price__gte=0), name="item_price_nonneg"),
+            models.CheckConstraint(condition=Q(units_per_pack__isnull=True) | Q(units_per_pack__gt=0),
+                                   name="item_units_per_pack_positive"),
         ]
 
     def __str__(self) -> str:

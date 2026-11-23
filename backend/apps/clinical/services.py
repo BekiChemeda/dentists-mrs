@@ -330,13 +330,7 @@ def _controlled_checks(ctx, encounter: Encounter, item: Item, line: dict, *, ser
         raise BusinessValidationError("The controlled-medicine prescription is incomplete.", fields=problems)
 
 
-@transaction.atomic
-def create_prescription(ctx: ActorContext, encounter: Encounter, items: list[dict], notes: str = "", *,
-                        special_form_serial: str = "", patient_weight_kg=None) -> Prescription:
-    encounter = orderable_encounter(ctx, encounter)
-    if not encounter.diagnoses.filter(is_removed=False).exists():
-        raise BusinessValidationError("Add the physician diagnosis before prescribing.",
-                                      fields={"diagnoses": ["Required before prescribing."]})
+def _resolve_prescription_lines(items: list[dict]) -> list[tuple]:
     if not items:
         raise BusinessValidationError("Add at least one medicine.", fields={"items": ["Required."]})
     resolved = []
@@ -350,6 +344,68 @@ def create_prescription(ctx: ActorContext, encounter: Encounter, items: list[dic
         if not name:
             raise BusinessValidationError("Each line needs a medicine.", fields={"items": ["Medicine required."]})
         resolved.append((line, item, name))
+    return resolved
+
+
+def _write_prescription(ctx: ActorContext, *, patient, visit_id, resolved: list[tuple], notes: str,
+                        encounter: Encounter | None = None, dental_encounter=None, controlled_class: str = "",
+                        special_form_serial: str = "", patient_weight_kg=None) -> Prescription:
+    """Allergy check, numbering, lines, audit and the pharmacy notice: the same for medical and dental prescriptions."""
+    conflicts = {}
+    for n, (line, item, name) in enumerate(resolved):
+        hits = allergy_conflicts(patient, item, name)
+        if hits and not (line.get("allergy_override_reason") or "").strip():
+            conflicts[n] = hits
+    if conflicts:
+        raise AllergyWarning(conflicts)
+
+    year = timezone.localdate().year
+    from apps.core.modules import is_enabled
+
+    # Without the pharmacy module the prescription is printed for the patient instead of queued here.
+    pharmacy_on = is_enabled("pharmacy")
+    rx = Prescription.objects.create(number=f"RX-{year}-{next_number('prescription', str(year)):05d}",
+                                     visit_id=visit_id, encounter=encounter, dental_encounter=dental_encounter,
+                                     patient=patient, prescriber=ctx.user,
+                                     notes=notes.strip(), controlled_class=controlled_class,
+                                     special_form_serial=special_form_serial.strip() if controlled_class else "",
+                                     patient_weight_kg=patient_weight_kg if controlled_class else None,
+                                     status=Prescription.Status.ACTIVE if pharmacy_on else Prescription.Status.EXTERNAL)
+    overrides = []
+    for line, item, name in resolved:
+        override = (line.get("allergy_override_reason") or "").strip()
+        if override and allergy_conflicts(patient, item, name):
+            overrides.append({"drug": name, "reason": override})
+        PrescriptionItem.objects.create(
+            prescription=rx, item=item, drug_name=name, strength=item.strength if item else "",
+            dosage_form=item.dosage_form if item else "", dose=line["dose"].strip(),
+            route=(line.get("route") or (item.route if item and item.route else "oral")),
+            frequency=line["frequency"].strip(), duration_days=line.get("duration_days"),
+            quantity=line["quantity"], instructions=line.get("instructions", "").strip(),
+            warnings=item.warnings if item else "", allergy_override_reason=override)
+    record_event(ctx, action="prescription.create", object_type="prescription", object_id=rx.pk,
+                 details={"patient": str(patient.pk), "items": len(resolved),
+                          **({"dental_encounter": str(dental_encounter.pk)} if dental_encounter else {}),
+                          **({"controlled": controlled_class, "form_serial": rx.special_form_serial}
+                             if controlled_class else {}),
+                          **({"allergy_overrides": overrides} if overrides else {})})
+    visit_event(ctx, visit_id, "prescription", f"Prescribed: {', '.join(l.drug_name for l in rx.items.all())}")
+    if pharmacy_on:
+        patient_name, drugs = patient.full_name, ", ".join(l.drug_name for l in rx.items.all())
+        transaction.on_commit(lambda: notify_permission_holders(
+            "pharmacy.dispense", kind="prescription", title=f"Prescription waiting: {patient_name}", body=drugs,
+            link=f"/pharmacy?rx={rx.pk}"))
+    return rx
+
+
+@transaction.atomic
+def create_prescription(ctx: ActorContext, encounter: Encounter, items: list[dict], notes: str = "", *,
+                        special_form_serial: str = "", patient_weight_kg=None) -> Prescription:
+    encounter = orderable_encounter(ctx, encounter)
+    if not encounter.diagnoses.filter(is_removed=False).exists():
+        raise BusinessValidationError("Add the physician diagnosis before prescribing.",
+                                      fields={"diagnoses": ["Required before prescribing."]})
+    resolved = _resolve_prescription_lines(items)
 
     controlled = [(line, item) for line, item, _ in resolved if item is not None and item.controlled_class]
     controlled_class = ""
@@ -363,49 +419,31 @@ def create_prescription(ctx: ActorContext, encounter: Encounter, items: list[dic
             patient_weight_kg = latest.weight_kg if latest else None
         _controlled_checks(ctx, encounter, item, line, serial=special_form_serial, weight=patient_weight_kg)
         controlled_class = item.controlled_class
+    return _write_prescription(ctx, patient=encounter.patient, visit_id=encounter.visit_id, resolved=resolved,
+                               notes=notes, encounter=encounter, controlled_class=controlled_class,
+                               special_form_serial=special_form_serial, patient_weight_kg=patient_weight_kg)
 
-    conflicts = {}
-    for n, (line, item, name) in enumerate(resolved):
-        hits = allergy_conflicts(encounter.patient, item, name)
-        if hits and not (line.get("allergy_override_reason") or "").strip():
-            conflicts[n] = hits
-    if conflicts:
-        raise AllergyWarning(conflicts)
 
-    year = timezone.localdate().year
-    from apps.core.modules import is_enabled
+@transaction.atomic
+def create_dental_prescription(ctx: ActorContext, dental_encounter, items: list[dict],
+                               notes: str = "") -> Prescription:
+    """
+    A prescription from a dental examination (ADR 0009). The dentist decides the medicine and dose; the system checks
+    the catalogue and the shared allergy list. Controlled medicines need the paper special prescription (review R-09).
+    """
+    from apps.dental.models import DentalEncounter
 
-    # Without the pharmacy module the prescription is printed for the patient instead of queued here.
-    pharmacy_on = is_enabled("pharmacy")
-    rx = Prescription.objects.create(number=f"RX-{year}-{next_number('prescription', str(year)):05d}",
-                                     encounter=encounter, patient=encounter.patient, prescriber=ctx.user,
-                                     notes=notes.strip(), controlled_class=controlled_class,
-                                     special_form_serial=special_form_serial.strip() if controlled_class else "",
-                                     patient_weight_kg=patient_weight_kg if controlled_class else None,
-                                     status=Prescription.Status.ACTIVE if pharmacy_on else Prescription.Status.EXTERNAL)
-    overrides = []
-    for line, item, name in resolved:
-        override = (line.get("allergy_override_reason") or "").strip()
-        if override and allergy_conflicts(encounter.patient, item, name):
-            overrides.append({"drug": name, "reason": override})
-        PrescriptionItem.objects.create(
-            prescription=rx, item=item, drug_name=name, strength=item.strength if item else "",
-            dosage_form=item.dosage_form if item else "", dose=line["dose"].strip(),
-            route=(line.get("route") or (item.route if item and item.route else "oral")),
-            frequency=line["frequency"].strip(), duration_days=line.get("duration_days"),
-            quantity=line["quantity"], instructions=line.get("instructions", "").strip(),
-            warnings=item.warnings if item else "", allergy_override_reason=override)
-    record_event(ctx, action="prescription.create", object_type="prescription", object_id=rx.pk,
-                 details={"patient": str(encounter.patient_id), "items": len(items),
-                          **({"controlled": controlled_class, "form_serial": rx.special_form_serial}
-                             if controlled_class else {}),
-                          **({"allergy_overrides": overrides} if overrides else {})})
-    visit_event(ctx, encounter.visit_id, "prescription", f"Prescribed: {', '.join(l.drug_name for l in rx.items.all())}")
-    patient_name, drugs = encounter.patient.full_name, ", ".join(l.drug_name for l in rx.items.all())
-    transaction.on_commit(lambda: notify_permission_holders(
-        "pharmacy.dispense", kind="prescription", title=f"Prescription waiting: {patient_name}", body=drugs,
-        link=f"/pharmacy?rx={rx.pk}"))
-    return rx
+    enc = DentalEncounter.objects.select_for_update().select_related("visit", "patient").get(pk=dental_encounter.pk)
+    if enc.dentist_id != ctx.user.pk:
+        raise ConflictError("Only the dentist who wrote this examination can prescribe from it.")
+    if enc.visit.status in (Visit.Status.COMPLETED, Visit.Status.CANCELLED):
+        raise ConflictError("This visit is closed. Reopen it to prescribe.")
+    resolved = _resolve_prescription_lines(items)
+    if any(item is not None and item.controlled_class for _l, item, _n in resolved):
+        raise ConflictError("Narcotic and psychotropic medicines are not prescribed from a dental examination in "
+                            "this system. Use the official special prescription form.")
+    return _write_prescription(ctx, patient=enc.patient, visit_id=enc.visit_id, resolved=resolved, notes=notes,
+                               dental_encounter=enc)
 
 
 @transaction.atomic

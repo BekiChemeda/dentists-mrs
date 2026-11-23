@@ -64,7 +64,23 @@ MODULES: dict[str, Module] = {m.key: m for m in [
            frozenset({"reports.operational", "reports.clinical", "reports.export", "reports.staff",
                       "reports.financial"}),
            when_off="The Reports page and the home-page graphs are hidden."),
+    # Dental MRS. Examinations, the chart, diagnoses, treatment plans and procedures are always on.
+    Module("periodontal", "Periodontal chart", "Six-site periodontal examinations with comparison over time.",
+           when_off="The periodontal chart is hidden and no new periodontal examinations can be recorded. "
+                    "Earlier charts stay in patient records."),
+    Module("dental_imaging", "Dental imaging", "Radiographs and clinical photographs stored on the clinic server.",
+           frozenset({"dental.imaging.view", "dental.imaging.upload", "dental.imaging.manage"}),
+           when_off="No image upload or viewing. Image files stay on the server and in backups."),
+    Module("dental_lab", "Dental laboratory cases", "Crowns, bridges and dentures sent to the dental technician.",
+           frozenset({"dental.labcase.manage", "dental.labcase.work"}),
+           when_off="No laboratory cases in the system; track outside laboratory work on paper."),
+    Module("recalls", "Recalls and follow-ups", "The list of patients due for a review or preventive recall.",
+           frozenset({"dental.recall.manage"}),
+           when_off="No recall list. Dentists write the review date in the examination note."),
 ]}
+
+# People who see patients: medical doctors and dentists. Used for doctor lists, queue access and alerts.
+CLINICIAN_PERMISSIONS = ("clinical.write", "dental.write")
 
 
 def _settings():
@@ -132,6 +148,24 @@ def open_work(key: str) -> list[str]:
         n = Visit.objects.filter(status=Visit.Status.WAITING_TRIAGE).count()
         if n:
             found.append(f"{n} patient(s) waiting for triage")
+    elif key == "periodontal":
+        from apps.dental.models import PeriodontalExam
+
+        n = PeriodontalExam.objects.filter(encounter__status="draft").count()
+        if n:
+            found.append(f"{n} periodontal chart(s) on unsigned examinations")
+    elif key == "dental_lab":
+        from apps.dental.models import DentalLabCase
+
+        n = DentalLabCase.objects.filter(status__in=DentalLabCase.OPEN).count()
+        if n:
+            found.append(f"{n} laboratory case(s) not yet delivered or cancelled")
+    elif key == "recalls":
+        from apps.dental.models import Recall
+
+        n = Recall.objects.filter(status=Recall.Status.BOOKED).count()
+        if n:
+            found.append(f"{n} recall(s) booked and not yet attended")
     return found
 
 
@@ -210,6 +244,18 @@ AREAS: list[tuple[str, str, str | None, dict[str, str]]] = [
                                        "payments.gateway.manage": "admin"}),
     ("reports", "Reports", "reports", {"reports.operational": "view", "reports.clinical": "view",
                                        "reports.financial": "view", "reports.staff": "view", "reports.export": "export"}),
+    ("dental", "Dental records", None, {"dental.view": "view", "dental.write": "work",
+                                         "dental.chart.record": "work", "dental.amend": "approve",
+                                         "dental.catalog.manage": "admin"}),
+    ("dental_plans", "Treatment plans and procedures", None, {"dental.plan.manage": "create",
+                                                              "dental.procedure.record": "work",
+                                                              "dental.procedure.sign": "approve"}),
+    ("dental_imaging", "Dental imaging", "dental_imaging", {"dental.imaging.view": "view",
+                                                            "dental.imaging.upload": "create",
+                                                            "dental.imaging.manage": "admin"}),
+    ("dental_lab", "Dental laboratory cases", "dental_lab", {"dental.labcase.manage": "create",
+                                                             "dental.labcase.work": "work"}),
+    ("recalls", "Recalls", "recalls", {"dental.recall.manage": "work"}),
     ("clinic", "Clinic administration", None, {"audit.operational": "view", "staff.manage": "admin",
                                                "departments.manage": "admin", "announcements.manage": "admin",
                                                "settings.manage": "admin", "branding.manage": "admin",

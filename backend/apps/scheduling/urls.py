@@ -7,6 +7,8 @@ urlpatterns = [
     path("calendar/", api.CalendarView.as_view()),
     path("calendar/holidays/", api.HolidayListCreateView.as_view()),
     path("calendar/holidays/<int:pk>/", api.HolidayDetailView.as_view()),
+    path("appointment-types/", api.AppointmentTypeListView.as_view()),
+    path("appointment-types/<uuid:pk>/", api.AppointmentTypeDetailView.as_view()),
     path("appointments/", api.AppointmentListCreateView.as_view()),
     path("appointments/<uuid:pk>/<str:action>/", api.AppointmentActionView.as_view()),
     path("visits/", api.VisitListCreateView.as_view()),

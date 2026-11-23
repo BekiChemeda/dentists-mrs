@@ -217,7 +217,13 @@ class Prescription(TimestampedModel):
 
     # Printed on the prescription, e.g. RX-2026-00042. Unique when set (see migration 0010).
     number = models.CharField(max_length=20, blank=True)
-    encounter = models.ForeignKey(Encounter, on_delete=models.PROTECT, related_name="prescriptions")
+    # Written in a medical consultation or in a dental examination (exactly one; ADR 0009). The visit is always set,
+    # so pharmacy, billing and visit completion work the same for both.
+    visit = models.ForeignKey(Visit, on_delete=models.PROTECT, related_name="prescriptions")
+    encounter = models.ForeignKey(Encounter, null=True, blank=True, on_delete=models.PROTECT,
+                                  related_name="prescriptions")
+    dental_encounter = models.ForeignKey("dental.DentalEncounter", null=True, blank=True, on_delete=models.PROTECT,
+                                         related_name="prescriptions")
     patient = models.ForeignKey(Patient, on_delete=models.PROTECT, related_name="prescriptions")
     prescriber = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="prescriptions")
     status = models.CharField(max_length=14, choices=Status.choices, default=Status.ACTIVE)
@@ -233,7 +239,12 @@ class Prescription(TimestampedModel):
         db_table = "clinical_prescription"
         ordering = ["-created_at"]
         indexes = [models.Index(fields=["status", "-created_at"], name="rx_status_idx")]
-        constraints = [models.UniqueConstraint(fields=["number"], condition=~Q(number=""), name="prescription_number_unique")]
+        constraints = [
+            models.UniqueConstraint(fields=["number"], condition=~Q(number=""), name="prescription_number_unique"),
+            models.CheckConstraint(condition=Q(encounter__isnull=False, dental_encounter__isnull=True)
+                                   | Q(encounter__isnull=True, dental_encounter__isnull=False),
+                                   name="prescription_one_encounter"),
+        ]
 
 
 class PrescriptionItem(UUIDModel):

@@ -23,7 +23,8 @@ class ItemSerializer(serializers.ModelSerializer):
         model = Item
         fields = ["id", "code", "name", "generic_name", "brand_name", "category", "dosage_form", "strength", "unit",
                   "route", "therapeutic_category", "controlled_class", "allergy_groups", "warnings", "default_supplier",
-                  "reorder_level", "selling_price", "is_active", "on_hand", "usable", "is_low", "row_version"]
+                  "reorder_level", "selling_price", "is_active", "on_hand", "usable", "is_low", "pack_unit",
+                  "units_per_pack", "row_version"]
 
     def get_is_low(self, obj):
         usable = getattr(obj, "usable", None)
@@ -49,6 +50,9 @@ class ItemInput(serializers.Serializer):
     reorder_level = serializers.DecimalField(max_digits=12, decimal_places=3, min_value=0, default=0)
     selling_price = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=0, default=0)
     is_active = serializers.BooleanField(default=True)
+    pack_unit = serializers.CharField(max_length=20, required=False, allow_blank=True, default="")
+    units_per_pack = serializers.DecimalField(max_digits=10, decimal_places=3, min_value=Decimal("0.001"),
+                                              required=False, allow_null=True, default=None)
 
 
 class SupplierSerializer(serializers.ModelSerializer):

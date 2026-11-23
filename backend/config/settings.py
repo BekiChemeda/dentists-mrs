@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     "apps.reports",
     "apps.devices",
     "apps.payments",
+    "apps.dental",
 ]
 
 MIDDLEWARE = [
@@ -239,6 +240,10 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Where deploy/scripts/backup.sh writes dumps; read by the system health page.
 BACKUP_DIR = env("BACKUP_DIR", "")
+
+# Dental image files (ADR 0007). Production: a host directory mounted into the api container only.
+DENTAL_IMAGE_ROOT = Path(env("DENTAL_IMAGE_ROOT", str(BASE_DIR / "var" / "dental-images")))
+DENTAL_IMAGE_MAX_BYTES = env_int("DENTAL_IMAGE_MAX_BYTES", 25 * 1024 * 1024)
 MRS_VERSION = env("MRS_VERSION", "")
 
 MRS_FACILITY_CODE = env("MRS_FACILITY_CODE", "CLN")

@@ -12,7 +12,7 @@ from apps.core.permissions import AnyOf
 from apps.patients.models import Patient
 
 from . import completion, services
-from .models import Appointment, Holiday, Visit, VisitEvent
+from .models import Appointment, AppointmentType, Holiday, Visit, VisitEvent
 from apps.core.concurrency import bump_version, guarded_edit
 
 
@@ -49,12 +49,21 @@ class AppointmentSerializer(serializers.ModelSerializer):
     visit_status = serializers.SerializerMethodField()
     display_status = serializers.SerializerMethodField()
     service = serializers.SerializerMethodField()
+    appointment_type = serializers.SerializerMethodField()
+    room = serializers.SerializerMethodField()
 
     class Meta:
         model = Appointment
         fields = ["id", "patient", "doctor", "scheduled_at", "scheduled_date", "duration_minutes", "reason", "notes",
-                  "service", "status", "display_status", "confirmed_at", "reschedule_count", "cancel_reason",
-                  "visit_id", "visit_status", "source_encounter", "created_at"]
+                  "service", "appointment_type", "room", "status", "display_status", "confirmed_at",
+                  "reschedule_count", "cancel_reason", "visit_id", "visit_status", "source_encounter", "created_at"]
+
+    def get_appointment_type(self, obj):
+        t = obj.appointment_type
+        return {"id": str(t.pk), "code": t.code, "name": t.name, "category": t.category} if t else None
+
+    def get_room(self, obj):
+        return {"id": str(obj.room_id), "name": obj.room.name} if obj.room_id else None
 
     def _visit(self, obj):
         try:
@@ -97,8 +106,8 @@ class VisitSerializer(serializers.ModelSerializer):
         fields = ["id", "patient", "visit_date", "queue_number", "kind", "status", "priority", "assigned_doctor",
                   "arrived_at", "consultation_started_at", "completed_at", "completed_by", "outcome",
                   "completion_note", "cancel_reason", "called_at", "called_by", "called_room", "skipped_at", "skip_reason",
-                  "waiting_minutes", "has_vitals", "triage", "diagnoses", "encounters", "appointment", "department",
-                  "internal_referral"]
+                  "waiting_minutes", "has_vitals", "triage", "diagnoses", "encounters", "dental_encounters",
+                  "appointment", "department", "internal_referral"]
 
     internal_referral = serializers.SerializerMethodField()
 
@@ -134,6 +143,12 @@ class VisitSerializer(serializers.ModelSerializer):
         return [{"id": str(e.pk), "doctor_id": str(e.doctor_id), "status": e.status}
                 for e in sorted(obj.encounters.all(), key=lambda e: e.created_at)]
 
+    dental_encounters = serializers.SerializerMethodField()
+
+    def get_dental_encounters(self, obj) -> list[dict]:
+        return [{"id": str(e.pk), "dentist_id": str(e.dentist_id), "status": e.status}
+                for e in sorted(obj.dental_encounters.all(), key=lambda e: e.created_at)]
+
     def get_diagnoses(self, obj) -> list[dict]:
         return [{"code": d.icd_id or "", "description": d.description}
                 for e in obj.encounters.all() for d in e.diagnoses.all() if not d.is_removed]
@@ -158,10 +173,12 @@ class AppointmentInput(serializers.Serializer):
     patient_id = serializers.UUIDField()
     doctor_id = serializers.UUIDField()
     scheduled_at = serializers.DateTimeField()
-    duration_minutes = serializers.IntegerField(min_value=5, max_value=240, default=15)
+    duration_minutes = serializers.IntegerField(min_value=5, max_value=240, required=False, allow_null=True)
     reason = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")
     notes = serializers.CharField(max_length=2000, required=False, allow_blank=True, default="")
     service_id = serializers.UUIDField(required=False, allow_null=True)
+    appointment_type_id = serializers.UUIDField(required=False, allow_null=True)
+    room_id = serializers.UUIDField(required=False, allow_null=True)
     # Set when a doctor books a follow-up from a consultation.
     encounter_id = serializers.UUIDField(required=False, allow_null=True)
 
@@ -171,6 +188,17 @@ class RescheduleInput(serializers.Serializer):
     duration_minutes = serializers.IntegerField(min_value=5, max_value=240, required=False)
     doctor_id = serializers.UUIDField(required=False, allow_null=True)
     reason = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")
+    room_id = serializers.UUIDField(required=False, allow_null=True)
+
+
+def _room(pk):
+    from apps.accounts.models import Room
+
+    return get_object_or_404(Room, pk=pk) if pk else None
+
+
+def _appointment_type(pk):
+    return get_object_or_404(AppointmentType, pk=pk) if pk else None
 
 
 def _service(pk):
@@ -183,7 +211,7 @@ class AppointmentListCreateView(PermissionedView):
     required_permissions = {"GET": ("appointments.view",), "POST": ("appointments.manage",)}
 
     def get(self, request):
-        qs = Appointment.objects.select_related("patient", "doctor", "visit", "service")
+        qs = Appointment.objects.select_related("patient", "doctor", "visit", "service", "appointment_type", "room")
         day = self.param_date("date")
         if day:
             qs = qs.filter(scheduled_date=day)
@@ -196,6 +224,8 @@ class AppointmentListCreateView(PermissionedView):
             qs = qs.filter(doctor_id=doctor)
         if patient := self.param_uuid("patient"):
             qs = qs.filter(patient_id=patient)
+        if room := self.param_uuid("room"):
+            qs = qs.filter(room_id=room)
         if st := request.query_params.get("status"):
             qs = qs.filter(status=st)
         return self.paginate(qs.order_by("scheduled_at"), AppointmentSerializer)
@@ -214,7 +244,9 @@ class AppointmentListCreateView(PermissionedView):
                                          doctor=_doctor(data["doctor_id"]), scheduled_at=data["scheduled_at"],
                                          duration_minutes=data["duration_minutes"], reason=data["reason"],
                                          notes=data["notes"], service=_service(data.get("service_id")),
-                                         source_encounter=encounter)
+                                         source_encounter=encounter,
+                                         appointment_type=_appointment_type(data.get("appointment_type_id")),
+                                         room=_room(data.get("room_id")))
         return Response(AppointmentSerializer(appt).data, status=status.HTTP_201_CREATED)
 
 
@@ -230,9 +262,10 @@ class AppointmentActionView(PermissionedView):
             services.confirm_appointment(self.ctx(), appt)
         elif action == "reschedule":
             data = validated(RescheduleInput, request.data)
+            extra = {"room": _room(data["room_id"])} if "room_id" in data else {}
             services.reschedule_appointment(self.ctx(), appt, scheduled_at=data["scheduled_at"],
                                             duration_minutes=data.get("duration_minutes"),
-                                            doctor=_doctor(data.get("doctor_id")), reason=data["reason"])
+                                            doctor=_doctor(data.get("doctor_id")), reason=data["reason"], **extra)
         elif action == "no-show":
             services.cancel_appointment(self.ctx(), appt, reason, no_show=True)
         elif action == "check-in":
@@ -257,7 +290,8 @@ def _visit_qs():
     from django.db.models import Count
 
     return (Visit.objects.select_related("patient", "assigned_doctor", "called_by", "completed_by")
-            .prefetch_related("vital_signs", "encounters__diagnoses", "internal_referrals__referred_by")
+            .prefetch_related("vital_signs", "encounters__diagnoses", "internal_referrals__referred_by",
+                              "dental_encounters")
             .annotate(vitals_count=Count("vital_signs", distinct=True)))
 
 
@@ -317,7 +351,7 @@ class VisitDetailView(PermissionedView):
         return Response(VisitSerializer(_visit_qs().get(pk=pk)).data)
 
 
-QUEUE_STAFF = AnyOf(("queue.manage", "triage.record", "clinical.write"))
+QUEUE_STAFF = AnyOf(("queue.manage", "triage.record", "clinical.write", "dental.write"))
 
 
 class VisitActionInput(serializers.Serializer):
@@ -345,7 +379,7 @@ class VisitActionView(PermissionedView):
         elif action == "return":
             services.return_to_queue(ctx, visit)
         elif action in ("complete", "reopen"):
-            if not request.user.has_any_permission(["queue.manage", "clinical.write"]):
+            if not request.user.has_any_permission(["queue.manage", "clinical.write", "dental.write"]):
                 return Response({"error": {"code": "permission_denied",
                                            "message": "You cannot complete or reopen visits."}}, status=403)
             if action == "complete":
@@ -436,7 +470,7 @@ class CalendarView(PermissionedView):
             d["by_status"][row["status"]] = row["n"]
             if row["status"] in Appointment.ACTIVE or row["status"] == Appointment.Status.COMPLETED:
                 d["total"] += row["n"]
-        doctors = User.objects.filter(is_active=True, roles__permissions__code="clinical.write").distinct().count()
+        doctors = services.doctors().count()
         return Response({"days": days, "holidays": holidays_between(start, end), "doctors": doctors})
 
 
@@ -474,3 +508,56 @@ class HolidayDetailView(PermissionedView):
                      details={"date": str(h.date), "name": h.name})
         h.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AppointmentTypeSerializer(serializers.ModelSerializer):
+    default_room = serializers.SerializerMethodField()
+    default_room_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+    code = serializers.SlugField(max_length=40)
+
+    class Meta:
+        model = AppointmentType
+        fields = ["id", "code", "name", "category", "default_minutes", "default_room", "default_room_id", "is_active",
+                  "sort_order", "row_version"]
+        read_only_fields = ["row_version"]
+
+    def get_default_room(self, obj):
+        return {"id": str(obj.default_room_id), "name": obj.default_room.name} if obj.default_room_id else None
+
+    def validate_default_minutes(self, value):
+        if not 5 <= value <= 240:
+            raise serializers.ValidationError("Between 5 and 240 minutes.")
+        return value
+
+
+APPT_TYPE_ADMIN = AnyOf(("dental.catalog.manage", "settings.manage"))
+
+
+class AppointmentTypeListView(PermissionedView):
+    """Appointment types: everyone who books sees the active ones; catalogue managers maintain them."""
+
+    required_permissions = {"GET": AnyOf(("appointments.view", "dental.catalog.manage", "settings.manage")),
+                            "POST": APPT_TYPE_ADMIN}
+
+    def get(self, request):
+        qs = AppointmentType.objects.select_related("default_room")
+        if not self.param_bool("all"):
+            qs = qs.filter(is_active=True)
+        return Response(AppointmentTypeSerializer(qs, many=True).data)
+
+    def post(self, request):
+        data = validated(AppointmentTypeSerializer, request.data)
+        appt_type = services.save_appointment_type(self.ctx(), data, room=_room(data.pop("default_room_id", None)))
+        return Response(AppointmentTypeSerializer(appt_type).data, status=status.HTTP_201_CREATED)
+
+
+class AppointmentTypeDetailView(PermissionedView):
+    required_permissions = {"PATCH": APPT_TYPE_ADMIN}
+
+    def patch(self, request, pk):
+        data = validated(AppointmentTypeSerializer, request.data, partial=True)
+        with guarded_edit(AppointmentType, pk, request, object_type="appointment_type",
+                          label="appointment type") as appt_type:
+            room = _room(data.pop("default_room_id")) if "default_room_id" in data else ...
+            services.save_appointment_type(self.ctx(), data, appt_type=appt_type, room=room)
+        return Response(AppointmentTypeSerializer(AppointmentType.objects.get(pk=pk)).data)

@@ -85,6 +85,9 @@ class ClinicSettings(Versioned, models.Model):
     # Close a visit automatically this many minutes after the consultation was signed, once nothing is
     # outstanding (no unverified tests, undispensed medicines or unpaid charges). 0 = staff close visits.
     auto_complete_minutes = models.PositiveSmallIntegerField(default=0)
+    # Dental visits are billed by procedure (examinations are procedures in the dental catalogue). When on, the
+    # clinic's consultation fee is also charged for a visit with a dental examination.
+    bill_consultation_for_dental = models.BooleanField(default=False)
     # The first-run checklist on the clinic administrator's dashboard, until they close it.
     setup_checklist_hidden = models.BooleanField(default=False)
     # Clinic logo, shown on screens and printed documents. Kept in the database (not on disk) so the

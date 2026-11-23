@@ -137,11 +137,15 @@ def unbilled_charges(visit) -> list[dict]:
                  .values_list("source_type", "source_id"))
     charges: list[dict] = []
     consult = _visit_service(visit)
-    if consult and ("visit", str(visit.pk)) not in billed and visit.encounters.exists():
+    settings_row = ClinicSettings.get()
+    # Dental visits are charged by procedure; the consultation fee only if the clinic chose to add one.
+    consulted = visit.encounters.exists() or (settings_row.bill_consultation_for_dental
+                                              and visit.dental_encounters.exists())
+    if consult and ("visit", str(visit.pk)) not in billed and consulted:
         charges.append({"kind": InvoiceLine.Kind.CONSULTATION, "description": consult.name, "quantity": Decimal(1),
                         "unit_price": consult.price, "source_type": "visit", "source_id": str(visit.pk),
                         "tax_rate": consult.tax_rate})
-    point = ClinicSettings.get().lab_billing_point
+    point = settings_row.lab_billing_point
     for item in (LabOrderItem.objects.select_related("test")
                  .filter(order__visit_id=visit.pk, status__in=LAB_BILLABLE[point], is_chargeable=True)):
         if ("lab_item", str(item.pk)) not in billed:
@@ -149,11 +153,20 @@ def unbilled_charges(visit) -> list[dict]:
                             "quantity": Decimal(1), "unit_price": item.price, "source_type": "lab_item",
                             "source_id": str(item.pk)})
     for d in (Dispensation.objects.select_related("item")
-              .filter(prescription_item__prescription__encounter__visit_id=visit.pk)):
+              .filter(prescription_item__prescription__visit_id=visit.pk)):
         if ("dispensation", str(d.pk)) not in billed:
             charges.append({"kind": InvoiceLine.Kind.MEDICATION, "description": str(d.item), "quantity": d.quantity,
                             "unit_price": d.unit_price, "source_type": "dispensation", "source_id": str(d.pk),
                             "tax_rate": d.item.tax_rate})
+    from apps.dental.services.procedures import billable_procedures
+
+    for rec in billable_procedures(visit):
+        if ("dental_procedure", str(rec.pk)) not in billed:
+            session = f" (session {rec.session_number})" if rec.status == "session_completed" else ""
+            where = f" — {rec.location_label}" if rec.scope != "mouth" else ""
+            charges.append({"kind": InvoiceLine.Kind.PROCEDURE, "description": f"{rec.procedure.name}{where}{session}"[:200],
+                            "quantity": Decimal(1), "unit_price": rec.price, "source_type": "dental_procedure",
+                            "source_id": str(rec.pk), "tax_rate": rec.tax_rate})
     return charges
 
 
