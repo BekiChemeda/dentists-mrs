@@ -372,3 +372,42 @@ def test_diagnosis_linked_to_plan_cannot_be_removed(dental, exam, catalog_data):
     ok(dental.dentist.post(f"/api/v1/dental/patients/{p['id']}/plans/", {"title": "RCT 46", "diagnosis_ids": [dx["id"]]},
                            format="json"), 201)
     assert dental.dentist.post(f"/api/v1/dental/diagnoses/{dx['id']}/remove/").status_code == 409
+
+
+def test_deferred_item_keeps_the_plan_open_until_decided(dental, exam, catalog_data):
+    """A deferred item may be accepted later (clinical-workflows.md): finishing the accepted work must not close the
+    plan while something is still deferred."""
+    p, _, enc = exam()
+    plan = _plan(dental, p["id"], [("RS-COMP2", {"scope": "surfaces", "tooth": 36, "surfaces": "DO"}),
+                                   ("OS-EXT", {"scope": "tooth", "tooth": 48})], catalog_data, enc)
+    comp, ext = plan["items"]
+    ok(dental.dentist.post(f"/api/v1/dental/plans/{plan['id']}/present/"))
+    ok(dental.dentist.post(f"/api/v1/dental/plans/{plan['id']}/decision/",
+                           {"decisions": {comp["id"]: "accepted", ext["id"]: "deferred"}}, format="json"))
+    rec = ok(_record(dental, enc, item=comp), 201)
+    ok(_sign(dental, rec))
+    plan = ok(dental.dentist.get(f"/api/v1/dental/plans/{plan['id']}/"))
+    assert plan["status"] == "in_progress"
+    # The patient comes back for the extraction: it can still be accepted and carried out.
+    plan = ok(dental.dentist.post(f"/api/v1/dental/plans/{plan['id']}/decision/",
+                                  {"decisions": {ext["id"]: "accepted"}}, format="json"))
+    assert {i["status"] for i in plan["items"]} == {"completed", "accepted"}
+    rec = ok(_record(dental, enc, item=ext), 201)
+    ok(_sign(dental, rec))
+    plan = ok(dental.dentist.get(f"/api/v1/dental/plans/{plan['id']}/"))
+    assert plan["status"] == "completed"
+
+
+def test_declining_the_deferred_item_completes_the_plan(dental, exam, catalog_data):
+    p, _, enc = exam()
+    plan = _plan(dental, p["id"], [("RS-COMP2", {"scope": "surfaces", "tooth": 36, "surfaces": "DO"}),
+                                   ("OS-EXT", {"scope": "tooth", "tooth": 48})], catalog_data, enc)
+    comp, ext = plan["items"]
+    ok(dental.dentist.post(f"/api/v1/dental/plans/{plan['id']}/present/"))
+    ok(dental.dentist.post(f"/api/v1/dental/plans/{plan['id']}/decision/",
+                           {"decisions": {comp["id"]: "accepted", ext["id"]: "deferred"}}, format="json"))
+    ok(_sign(dental, ok(_record(dental, enc, item=comp), 201)))
+    plan = ok(dental.dentist.post(f"/api/v1/dental/plans/{plan['id']}/decision/",
+                                  {"decisions": {ext["id"]: "declined"}}, format="json"))
+    assert plan["status"] == "completed"
+    assert {i["status"] for i in plan["items"]} == {"completed", "declined"}

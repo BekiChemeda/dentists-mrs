@@ -87,7 +87,9 @@ def derive_status(plan: TreatmentPlan) -> str:
         return plan.status
     started = any(s in (I.IN_PROGRESS, I.COMPLETED) for s in items)
     if started:
-        open_work = any(s in (I.ACCEPTED, I.IN_PROGRESS, I.PROPOSED) for s in items)
+        # A deferred item is still outstanding: the patient may come back for it, and a completed plan can no
+        # longer change. The plan stays in progress until it is done, cancelled or declined.
+        open_work = any(s in (I.ACCEPTED, I.IN_PROGRESS, I.PROPOSED, I.DEFERRED) for s in items)
         return P.IN_PROGRESS if open_work else P.COMPLETED
     if any(s == I.PROPOSED for s in items):
         return P.PRESENTED

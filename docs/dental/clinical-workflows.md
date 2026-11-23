@@ -70,7 +70,7 @@ stateDiagram-v2
     deferred --> presented : present again
     accepted --> in_progress : first procedure signed on an item
     partially_accepted --> in_progress : first procedure signed on an item
-    in_progress --> completed : every accepted item completed or cancelled
+    in_progress --> completed : every item completed, cancelled or declined (none deferred)
     draft --> cancelled
     presented --> cancelled
     accepted --> cancelled
