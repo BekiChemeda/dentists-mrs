@@ -11,6 +11,18 @@ member for each step, the way the clinic works:
 | `test_refund_needs_a_second_person` | Cashier asks for a refund, the manager approves, the cashier pays it out |
 | `test_merge_duplicate_records` | Merging a duplicate registration; the retired record points to the kept one |
 
+The tests above need triage, laboratory and pharmacy switched on (a medical installation). The dental scenarios in
+`test_dental.py` need a dental installation (`manage.py apply_dental_defaults`): run the two groups against separate
+demo databases.
+
+| Dental test (`test_dental.py`) | What it covers |
+| --- | --- |
+| `test_toothache_to_filling_invoice_and_follow_up` | History review, complaint (unsaved text kept across tabs, signing blocked until saved), chart findings on teeth and surfaces, periodontal chart starting from the chart's missing teeth, diagnosis, plan with one item deferred, procedure record (notes kept through a materials save), signing, recall, invoice paid once, visit completion, a return visit and the chart comparison |
+| `test_receptionist_cannot_open_the_dental_chart` | No dental record link for reception, and the API refuses the chart |
+| `test_assistant_cannot_sign_an_examination` | No Sign button for the dental assistant, and the API refuses it |
+
+See [docs/dental/testing.md](../docs/dental/testing.md) for how they map to the specification's scenarios.
+
 ## Running
 
 1. Start the stack and load the demo staff (development only, never on a server with real data):

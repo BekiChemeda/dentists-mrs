@@ -38,7 +38,14 @@ DEMO_STAFF = [("reception", "Hirut", "Desta", "receptionist", "reception"),
               ("cashier", "Liya", "Tadesse", "cashier", "finance"),
               ("store", "Yonas", "Fikre", "inventory_manager", "pharmacy"),
               ("manager", "Rahel", "Wolde", "clinic_admin", "administration"),
-              ("director", "Tewodros", "Bekele", "clinic_director", "administration")]
+              ("director", "Tewodros", "Bekele", "clinic_director", "administration"),
+              # Dental team
+              ("dentist", "Selam", "Tesfaye", "dentist", "dental"),
+              ("dentist2", "Natnael", "Assefa", "dentist", "dental"),
+              ("assistant", "Hawi", "Gudeta", "dental_assistant", "dental"),
+              ("hygienist", "Eden", "Mengistu", "dental_hygienist", "dental"),
+              ("dentaltech", "Biruk", "Lemma", "dental_technician", "dental"),
+              ("imaging", "Kidist", "Haile", "imaging_staff", "dental")]
 DEMO_PASSWORD = "Demo-Clinic-2026"
 
 
@@ -57,6 +64,8 @@ class Command(BaseCommand):
             raise CommandError("Refusing to create demo data outside development. See --help.")
         rng = random.Random(seed)
         call_command("load_starter_catalog", verbosity=0)
+        call_command("load_dental_catalog", verbosity=0)
+        self._dental_prices(rng)
         actor = User.objects.filter(is_active=True).order_by("created_at").first()
         if actor is None:
             raise CommandError("Create an administrator first (manage.py bootstrap_admin).")
@@ -67,8 +76,20 @@ class Command(BaseCommand):
         if patients:
             self._patients(patients, actor, rng)
 
+    def _dental_prices(self, rng):
+        """Demo prices for the starter procedures, which ship at 0 for the clinic to set. Synthetic only."""
+        from apps.dental.models import DentalProcedure
+
+        for proc in DentalProcedure.objects.filter(price=0):
+            DentalProcedure.objects.filter(pk=proc.pk).update(price=Decimal(rng.choice([150, 300, 500, 800, 1500,
+                                                                                        2500, 4000])))
+
     def _staff(self):
-        from apps.accounts.models import Department
+        from apps.accounts.models import Department, Room
+
+        dental, _ = Department.objects.get_or_create(code="dental", defaults={"name": "Dental", "receives_triage": True})
+        for order, name in enumerate(["Chair 1", "Chair 2", "Chair 3"]):
+            Room.objects.get_or_create(name=name, defaults={"department": dental, "sort_order": order})
 
         for username, first, last, role, dept in DEMO_STAFF:
             user, created = User.objects.get_or_create(
