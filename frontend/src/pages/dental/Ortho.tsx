@@ -1600,7 +1600,7 @@ export function OrthoCasesPage() {
                     <Link to={`/dental/patients/${c.patient.id}?tab=ortho`}>{c.patient.full_name}</Link>{" "}
                     <span className="mono small">{c.patient.mrn}</span>
                   </td>
-                  <td className="mono">{c.number}</td>
+                  <td className="mono nowrap">{c.number}</td>
                   <td>
                     <Badge tone={STATUS_TONE[c.status]}>{c.status_label}</Badge>
                   </td>
