@@ -165,6 +165,7 @@ export function PatientForm({
   }
 
   const fe = (k: string) => fieldErrors(error, k);
+  const phoneBad = !!f.phone && /[^\d\s+()-]/.test(f.phone);
   return (
     <form onSubmit={onSubmit} noValidate className="stack">
       {!!error && Object.keys((error as ApiError).fields ?? {}).length === 0 && (
@@ -230,7 +231,7 @@ export function PatientForm({
             error={
               fe("phone").length
                 ? fe("phone")
-                : f.phone && /[^\d\s+()-]/.test(f.phone)
+                : phoneBad
                   ? [t("patients.phone_digits", "Use digits only, e.g. 0911 234 567 or +251 911 234 567.")]
                   : undefined
             }
@@ -336,16 +337,20 @@ export function PatientForm({
         </fieldset>
       )}
       <div className="form-actions">
-        {(!f.first_name || !f.sex) && (
+        {(!f.first_name || !f.sex || phoneBad) && (
           <span className="small muted">
             {t("patients.still_needed", "Still needed: {{fields}}", {
-              fields: [!f.first_name && t("patients.first_name", "First name"), !f.sex && t("patients.sex", "Sex")]
+              fields: [
+                !f.first_name && t("patients.first_name", "First name"),
+                !f.sex && t("patients.sex", "Sex"),
+                phoneBad && t("patients.valid_phone", "a phone number with digits only"),
+              ]
                 .filter(Boolean)
                 .join(", "),
             })}
           </span>
         )}
-        <button className="btn btn-primary" type="submit" disabled={busy || !f.first_name || !f.sex}>
+        <button className="btn btn-primary" type="submit" disabled={busy || !f.first_name || !f.sex || phoneBad}>
           {busy
             ? t("common.saving")
             : patient

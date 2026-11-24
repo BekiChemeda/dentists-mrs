@@ -18,7 +18,8 @@ export function labelCells(root: ParentNode): void {
         const foot = body === table.tFoot;
         for (const cell of Array.from(row.cells)) {
           // In a totals row the first cell names the row ("Total"), so it gets no column label.
-          const label = foot && col === 0 ? "" : (labels[col] ?? "");
+          // A short totals row ("Total cost | 30.00") reads best without column labels.
+          const label = foot && (col === 0 || row.cells.length <= 3) ? "" : (labels[col] ?? "");
           if (cell.getAttribute("data-label") !== label) cell.setAttribute("data-label", label);
           col += cell.colSpan || 1;
         }

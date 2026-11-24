@@ -360,7 +360,9 @@ export function InvoicePage() {
       <ErrorBanner error={act.error ?? removeLine.error} />
       {pending.map((a) => (
         <Banner key={a.id} tone="warn">
-          {a.kind_label}: {t("billing.waiting_approval", "waiting for approval")} ({a.summary})
+          {t("billing.waiting_approval_full", "Waiting for a manager's approval: {{what}}", {
+            what: a.summary.replace(/\s*\([^)]*\)\s*$/, ""),
+          })}
         </Banner>
       ))}
       {myApproved.map((a) => (
@@ -545,6 +547,14 @@ export function InvoicePage() {
               </div>
             </div>
             <div className="stack-sm" style={{ marginTop: 16 }}>
+              {draft && can("billing.invoice") && pending.some((a) => a.kind === "discount") && (
+                <Banner tone="warn">
+                  {t(
+                    "billing.discount_pending_issue",
+                    "A discount is waiting for approval. You can issue now, but apply the discount (once approved) before taking the full payment.",
+                  )}
+                </Banner>
+              )}
               {draft && can("billing.invoice") && (
                 <button
                   className="btn btn-primary"

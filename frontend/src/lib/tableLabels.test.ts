@@ -11,3 +11,14 @@ describe("labelCells", () => {
     expect(cells).toEqual(["Date", "Patient", "Patient", "", "Date", ""]);
   });
 });
+
+describe("totals rows", () => {
+  it("leave a short totals row unlabelled", () => {
+    document.body.innerHTML = `<table class="data"><thead><tr><th>Item</th><th>Qty</th><th>Cost</th></tr></thead>
+      <tbody><tr><td>a</td><td>1</td><td>2</td></tr></tbody>
+      <tfoot><tr><td colspan="2">Total</td><td>2</td></tr></tfoot></table>`;
+    labelCells(document);
+    const foot = Array.from(document.querySelectorAll("tfoot td")).map((c) => c.getAttribute("data-label"));
+    expect(foot).toEqual(["", ""]);
+  });
+});

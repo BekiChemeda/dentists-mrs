@@ -245,7 +245,12 @@ function MaterialsEditor({ record, editable }: { record: ProcedureRecord; editab
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [rows, setRows] = useState(
-    record.materials.map((m) => ({ item_id: m.item_id, item: m.item, unit: m.unit, quantity: m.quantity })),
+    record.materials.map((m) => ({
+      item_id: m.item_id,
+      item: m.item,
+      unit: m.unit,
+      quantity: String(Number(m.quantity)),
+    })),
   );
   const [search, setSearch] = useState("");
   const found = useGet<Paginated<StockItem>>(

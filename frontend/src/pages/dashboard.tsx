@@ -17,7 +17,7 @@ import { useAuth } from "../auth/AuthContext";
 import { StateBadge } from "../labels";
 import { formatDateTime, formatDay, formatLongDate, isoDateDaysAgo } from "../lib/format";
 import { dashboardFor } from "../navigation";
-import { Empty, PageHead, Panel } from "../ui";
+import { Empty, Loading, PageHead, Panel } from "../ui";
 import { SummaryFigures, type DailySummary } from "./billing";
 import { Ec, sexAge, timeOf, todayIso, waitLabel } from "./common";
 import { StockAlerts } from "./inventory";
@@ -153,7 +153,8 @@ function QueueBlock() {
     { refetchInterval: 30_000 },
   );
   const v = q.data ?? [];
-  const count = (s: string) => v.filter((x) => x.status === s).length;
+  // Until the first answer arrives, show a dash rather than a misleading 0.
+  const count = (s: string): number | string => (q.data ? v.filter((x) => x.status === s).length : "–");
   const waiting = v.filter((x) => x.status === "waiting_doctor" || x.status === "waiting_triage");
   const longest = Math.max(0, ...waiting.map((x) => x.waiting_minutes ?? 0));
   return (
@@ -167,12 +168,12 @@ function QueueBlock() {
     >
       <div className="figures">
         {moduleOn("triage") && (
-          <div className={`figure${count("waiting_triage") ? " attention" : ""}`}>
+          <div className={`figure${Number(count("waiting_triage")) > 0 ? " attention" : ""}`}>
             <b>{count("waiting_triage")}</b>
             <span>{t("queue.lane_triage", "Waiting for triage")}</span>
           </div>
         )}
-        <div className={`figure${count("waiting_doctor") ? " attention" : ""}`}>
+        <div className={`figure${Number(count("waiting_doctor")) > 0 ? " attention" : ""}`}>
           <b>{count("waiting_doctor")}</b>
           <span>{t("queue.lane_doctor", "Waiting for doctors")}</span>
         </div>
@@ -189,7 +190,7 @@ function QueueBlock() {
           <span>{t("dash.seen", "Visits completed")}</span>
         </div>
         <div className={`figure${longest >= 60 ? " danger" : ""}`}>
-          <b>{waitLabel(longest) || "0 min"}</b>
+          <b>{q.data ? waitLabel(longest) || "0 min" : "–"}</b>
           <span>{t("dash.longest_wait", "Longest wait")}</span>
         </div>
       </div>
@@ -280,7 +281,9 @@ function LabCasesBlock() {
       }
       flush
     >
-      {!rows.length ? (
+      {q.isLoading ? (
+        <Loading />
+      ) : !rows.length ? (
         <Empty>{t("dash.no_lab_cases", "No open laboratory cases.")}</Empty>
       ) : (
         <table className="data">

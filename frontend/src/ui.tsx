@@ -2,7 +2,7 @@
  * Shared UI building blocks. Every user-facing string goes through t(key, default) so that
  * `npx i18next-parser` can extract them for Amharic and Afaan Oromo translation files.
  */
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle, Check, CheckCircle2, Info, Inbox, MoreHorizontal, X, XCircle } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -159,6 +159,7 @@ export function Modal({
   wide?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   const { t } = useTranslation();
   useEffect(() => {
     const d = ref.current;
@@ -167,9 +168,9 @@ export function Modal({
     if (!open && d.open) d.close();
   }, [open]);
   return (
-    <dialog ref={ref} className={`modal${wide ? " wide" : ""}`} onClose={onClose} aria-labelledby="modal-title">
+    <dialog ref={ref} className={`modal${wide ? " wide" : ""}`} onClose={onClose} aria-labelledby={titleId}>
       <div className="modal-head">
-        <h2 id="modal-title">{title}</h2>
+        <h2 id={titleId}>{title}</h2>
         <button type="button" className="btn btn-ghost btn-icon" onClick={onClose} aria-label={t("common.close")}>
           <X size={20} />
         </button>

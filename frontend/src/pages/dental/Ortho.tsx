@@ -696,7 +696,17 @@ function OrthoCaseDetail({ c, encounterId, patientId }: { c: OrthoCase; encounte
             )}
           </p>
           <ErrorBanner error={act.error} />
-          <Field label={t("dental.ortho_removed_on", "Braces removed on")} id="f-removed_on">
+          <Field
+            label={t("dental.ortho_removed_on", "Braces removed on")}
+            id="f-removed_on"
+            hint={
+              c.started_on
+                ? t("dental.ortho_removed_range", "Between {{start}} (treatment started) and today.", {
+                    start: formatDay(c.started_on),
+                  })
+                : undefined
+            }
+          >
             <input
               id="f-removed_on"
               type="date"
@@ -1121,15 +1131,22 @@ function BillingForm({ c, onDone }: { c: OrthoCase; onDone: () => void }) {
   const open = c.instalments
     .filter((i) => i.status === "scheduled" && !i.invoice)
     .sort((a, b) => a.due_date.localeCompare(b.due_date));
+  // The deposit is its own row; it is kept as the deposit only while nothing has been invoiced.
+  const openDeposit = invoiced === 0 ? open.find((i) => i.label === "Deposit") : undefined;
+  const regular = open.filter((i) => i !== openDeposit);
   const gap =
-    open.length > 1 ? Math.round((Date.parse(open[1].due_date) - Date.parse(open[0].due_date)) / 86_400_000) : 30;
+    regular.length > 1
+      ? Math.round((Date.parse(regular[1].due_date) - Date.parse(regular[0].due_date)) / 86_400_000)
+      : 30;
+  const firstDue = (openDeposit ?? regular[0])?.due_date;
   const [f, setF] = useState<Record<string, string>>({
     billing_mode: c.billing_mode,
     package_price: c.package_price ?? "",
     per_visit_price: c.per_visit_price ?? "",
-    instalment_count: String(open.length || 6),
-    instalment_interval_days: String(gap > 0 ? gap : 30),
-    first_payment_date: open[0] && open[0].due_date > today() ? open[0].due_date : today(),
+    deposit: openDeposit ? String(Number(openDeposit.amount)) : "",
+    instalment_count: String(regular.length || 6),
+    instalment_interval_days: String(gap >= 7 ? gap : 30),
+    first_payment_date: firstDue && firstDue > today() ? firstDue : today(),
     reason: "",
   });
   const set = (k: string, v: string) => setF((x) => ({ ...x, [k]: v }));

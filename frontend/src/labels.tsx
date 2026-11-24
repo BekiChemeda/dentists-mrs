@@ -166,13 +166,6 @@ export const FREQUENCY_LABELS: Record<string, string> = {
   Weekly: "Once a week",
 };
 
-/** A quantity without trailing zeros: "15.000" becomes "15", "2.500" becomes "2.5". */
-export function qty(v: string | number | null | undefined): string {
-  if (v === null || v === undefined || v === "") return "";
-  const n = Number(v);
-  return Number.isFinite(n) ? String(n) : String(v);
-}
-
 /** The evaluation note in the order it is written. Signing needs the complaint, a diagnosis and the plan. */
 export const NOTE_GROUPS: { title: string; fields: string[]; hint?: Record<string, string> }[] = [
   { title: "1. Presenting complaint", fields: ["chief_complaint", "complaint_duration"] },
