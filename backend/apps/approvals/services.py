@@ -32,6 +32,19 @@ def request_approval(ctx: ActorContext, *, kind: str, object_type: str, object_i
     return req
 
 
+def blocking_problem(req: ApprovalRequest) -> str | None:
+    """Why approving this request would have no effect (the thing it is for has moved on), or None."""
+    if req.kind == ApprovalRequest.Kind.DISCOUNT and req.object_type == "invoice":
+        from apps.billing.models import Invoice
+        from apps.billing.services import discount_problem
+
+        invoice = Invoice.objects.filter(pk=req.object_id).first()
+        if invoice is None:
+            return "The invoice for this discount no longer exists."
+        return discount_problem(invoice, req.amount or 0)
+    return None
+
+
 @transaction.atomic
 def decide(ctx: ActorContext, req: ApprovalRequest, *, approve: bool, note: str = "") -> ApprovalRequest:
     req = ApprovalRequest.objects.select_for_update().get(pk=req.pk)
@@ -45,6 +58,8 @@ def decide(ctx: ActorContext, req: ApprovalRequest, *, approve: bool, note: str 
         raise PermissionDenied()
     if not approve and not note.strip():
         raise BusinessValidationError("Give a reason for rejecting.", fields={"note": ["Required."]})
+    if approve and (problem := blocking_problem(req)):
+        raise ConflictError(problem)
     req.status = ApprovalRequest.Status.APPROVED if approve else ApprovalRequest.Status.REJECTED
     req.decided_by = ctx.user
     req.decided_at = timezone.now()
@@ -75,11 +90,16 @@ def consume(ctx: ActorContext, approval_id, *, kind: str, object_type: str, obje
 @transaction.atomic
 def cancel(ctx: ActorContext, req: ApprovalRequest) -> ApprovalRequest:
     req = ApprovalRequest.objects.select_for_update().get(pk=req.pk)
-    if req.requested_by_id != ctx.user.pk:
+    # An approver may also close a request that can no longer take effect (e.g. a discount on a paid invoice),
+    # so it does not sit on the invoice forever.
+    stale_close = (req.requested_by_id != ctx.user.pk and blocking_problem(req) is not None
+                   and ctx.user.has_permissions([ApprovalRequest.PERMISSION_FOR_KIND[req.kind]]))
+    if req.requested_by_id != ctx.user.pk and not stale_close:
         raise ConflictError("Only the requester can withdraw this request.")
     if req.status not in (ApprovalRequest.Status.PENDING, ApprovalRequest.Status.APPROVED):
         raise ConflictError("This request can no longer be withdrawn.")
     req.status = ApprovalRequest.Status.CANCELLED
     req.save(update_fields=["status", "updated_at"])
-    record_event(ctx, action="approval.cancel", object_type="approval", object_id=req.pk)
+    record_event(ctx, action="approval.cancel", object_type="approval", object_id=req.pk,
+                 details={"kind": req.kind, **({"closed_as_stale": True} if stale_close else {})})
     return req

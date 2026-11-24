@@ -332,18 +332,21 @@ export function InvoicePage() {
       setVoidOpen(false);
     },
   );
+  const closeStale = useAction((approvalId: string) => api.post(`/approvals/${approvalId}/withdraw/`, {}), keys);
   const removeLine = useAction((lineId: string) => api.post(`/billing/lines/${lineId}/remove/`), keys);
 
   if (!inv.data) return inv.error ? <ErrorBanner error={inv.error} /> : <Loading />;
   const i = inv.data;
   const draft = i.status === "draft";
   const open = ["draft", "issued", "partial"].includes(i.status);
+  // Requests that can no longer take effect (e.g. a discount approved after the invoice was paid in full).
+  const stuck = approvals.data?.results.filter((a) => ["pending", "approved"].includes(a.status) && a.problem) ?? [];
   const myApproved =
     approvals.data?.results.filter(
-      (a) => a.status === "approved" && a.requested_by.id === user?.id && a.kind !== "refund",
+      (a) => a.status === "approved" && a.requested_by.id === user?.id && a.kind !== "refund" && !a.problem,
     ) ?? [];
   const refundsToPay = approvals.data?.results.filter((a) => a.status === "approved" && a.kind === "refund") ?? [];
-  const pending = approvals.data?.results.filter((a) => a.status === "pending") ?? [];
+  const pending = approvals.data?.results.filter((a) => a.status === "pending" && !a.problem) ?? [];
 
   return (
     <div className="stack">
@@ -357,12 +360,38 @@ export function InvoicePage() {
         }
         actions={<StateBadge set="invoice" value={i.status} />}
       />
-      <ErrorBanner error={act.error ?? removeLine.error} />
+      <ErrorBanner error={act.error ?? removeLine.error ?? closeStale.error} />
       {pending.map((a) => (
         <Banner key={a.id} tone="warn">
           {t("billing.waiting_approval_full", "Waiting for a manager's approval: {{what}}", {
             what: a.summary.replace(/\s*\([^)]*\)\s*$/, ""),
           })}
+        </Banner>
+      ))}
+      {stuck.map((a) => (
+        <Banner key={a.id} tone="warn">
+          <div className="row-between">
+            <span>
+              <strong>
+                {a.status === "approved"
+                  ? t("billing.stuck_approved", "{{what}} was approved by {{who}} but has not been applied.", {
+                      what: a.kind_label,
+                      who: a.decided_by?.full_name,
+                    })
+                  : t("billing.stuck_pending", "{{what}} is still waiting for a decision.", { what: a.kind_label })}
+              </strong>{" "}
+              {a.problem}
+            </span>
+            {a.status === "approved" && (a.requested_by.id === user?.id || can("billing.discount.approve")) && (
+              <button
+                className="btn btn-sm"
+                disabled={closeStale.isPending}
+                onClick={() => closeStale.mutate(a.id)}
+              >
+                {t("approvals.close_stale", "Close without applying")}
+              </button>
+            )}
+          </div>
         </Banner>
       ))}
       {myApproved.map((a) => (

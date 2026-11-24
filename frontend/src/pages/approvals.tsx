@@ -69,6 +69,7 @@ export function ApprovalsPage() {
                       <div>{a.summary}</div>
                       {a.amount && <div className="small muted">{money(a.amount)} ETB</div>}
                       {a.quantity && <div className="small muted">{qty(a.quantity)}</div>}
+                      {a.problem && <div className="banner banner-warn small">{a.problem}</div>}
                       {a.object_type === "invoice" && (
                         <Link className="small" to={`/billing/invoices/${a.object_id}`}>
                           {t("approvals.open_invoice", "Open invoice")}
@@ -93,17 +94,28 @@ export function ApprovalsPage() {
                     <td className="num">
                       {a.can_decide && (
                         <div className="row" style={{ justifyContent: "flex-end" }}>
-                          <button
-                            className="btn btn-sm btn-primary"
-                            disabled={act.isPending}
-                            onClick={() => act.mutate({ id: a.id, action: "approve" })}
-                          >
-                            {t("approvals.approve", "Approve")}
-                          </button>
+                          {!a.problem && (
+                            <button
+                              className="btn btn-sm btn-primary"
+                              disabled={act.isPending}
+                              onClick={() => act.mutate({ id: a.id, action: "approve" })}
+                            >
+                              {t("approvals.approve", "Approve")}
+                            </button>
+                          )}
                           <button className="btn btn-sm btn-danger" onClick={() => setRejecting(a)}>
                             {t("approvals.reject", "Reject")}
                           </button>
                         </div>
+                      )}
+                      {a.status === "approved" && a.problem && (
+                        <button
+                          className="btn btn-sm"
+                          disabled={act.isPending}
+                          onClick={() => act.mutate({ id: a.id, action: "withdraw" })}
+                        >
+                          {t("approvals.close_stale", "Close without applying")}
+                        </button>
                       )}
                       {!a.can_decide && a.status === "pending" && (
                         <span className="small subtle">{t("approvals.waiting_other", "Waiting for an approver")}</span>

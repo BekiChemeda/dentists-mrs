@@ -37,16 +37,50 @@ def _lock(invoice: Invoice) -> Invoice:
     return Invoice.objects.select_for_update().get(pk=invoice.pk)
 
 
-def _recalculate(invoice: Invoice) -> None:
-    lines = list(invoice.lines.filter(is_void=False))
-    invoice.subtotal = money(sum((l.line_total for l in lines), Decimal("0")))
-    if invoice.discount_amount > invoice.subtotal:
-        invoice.discount_amount = invoice.subtotal
+def _totals(lines, discount: Decimal) -> tuple[Decimal, Decimal, Decimal, Decimal]:
+    """(subtotal, discount, tax, total) for these lines with this discount."""
+    subtotal = money(sum((l.line_total for l in lines), Decimal("0")))
+    discount = min(discount, subtotal)
     # Tax is charged on what the patient actually pays: each line's tax is reduced by the discount share.
     gross_tax = sum((l.line_total * l.tax_rate / 100 for l in lines), Decimal("0"))
-    share = (invoice.subtotal - invoice.discount_amount) / invoice.subtotal if invoice.subtotal else Decimal("0")
-    invoice.tax_amount = money(gross_tax * share)
-    invoice.total = invoice.subtotal - invoice.discount_amount + invoice.tax_amount
+    share = (subtotal - discount) / subtotal if subtotal else Decimal("0")
+    tax = money(gross_tax * share)
+    return subtotal, discount, tax, subtotal - discount + tax
+
+
+def _recalculate(invoice: Invoice) -> None:
+    lines = list(invoice.lines.filter(is_void=False))
+    invoice.subtotal, invoice.discount_amount, invoice.tax_amount, invoice.total = _totals(
+        lines, invoice.discount_amount)
+
+
+OPEN_STATUSES = (Invoice.Status.DRAFT, Invoice.Status.ISSUED, Invoice.Status.PARTIAL)
+
+
+def outstanding_discounts(invoice: Invoice) -> Decimal:
+    """Discounts requested or approved for this invoice but not yet applied."""
+    return ApprovalRequest.objects.filter(
+        kind=ApprovalRequest.Kind.DISCOUNT, object_type="invoice", object_id=str(invoice.pk),
+        status__in=(ApprovalRequest.Status.PENDING, ApprovalRequest.Status.APPROVED),
+    ).aggregate(s=Sum("amount"))["s"] or Decimal("0")
+
+
+def total_after_discount(invoice: Invoice, extra: Decimal) -> Decimal:
+    return _totals(list(invoice.lines.filter(is_void=False)), invoice.discount_amount + extra)[3]
+
+
+def discount_problem(invoice: Invoice, amount: Decimal) -> str | None:
+    """Why a discount of this amount can no longer be applied to the invoice, or None if it can."""
+    if invoice.status not in OPEN_STATUSES:
+        if invoice.status == Invoice.Status.PAID:
+            return (f"{invoice.number} is already paid in full ({invoice.amount_paid} ETB), so the discount cannot "
+                    f"be applied. Reject it. If the patient should get money back, request a refund from the receipt.")
+        return f"{invoice.number} is {invoice.get_status_display().lower()}, so the discount cannot be applied."
+    if total_after_discount(invoice, amount) < invoice.amount_paid:
+        return (f"{invoice.amount_paid} ETB has already been paid on {invoice.number}; with this discount the total "
+                f"would be {total_after_discount(invoice, amount)} ETB, less than what was paid. Reject it, or approve "
+                f"a smaller discount request. If the patient should get money back, request a refund from the receipt.")
+    return None
 
 
 @transaction.atomic
@@ -260,6 +294,14 @@ def record_payment(ctx: ActorContext, invoice: Invoice, *, amount, method: str, 
     if amount > invoice.balance:
         raise ConflictError(f"The balance is {invoice.balance} ETB; the payment is larger.",
                             fields={"amount": [f"Maximum {invoice.balance}."]})
+    # A discount that is waiting (or approved but not yet applied) would otherwise leave the patient overpaid.
+    if waiting := outstanding_discounts(invoice):
+        most = total_after_discount(invoice, waiting) - invoice.amount_paid
+        if amount > most:
+            raise ConflictError(
+                f"A discount of {waiting} ETB on this invoice is not settled yet. Take at most {most} ETB now; "
+                f"collect the rest only if the discount is rejected, or apply it first once approved.",
+                fields={"amount": [f"Maximum {most} until the discount is settled."]})
     if method != Payment.Method.CASH and not reference.strip():
         raise BusinessValidationError("Enter the transaction reference.", fields={"reference": ["Required."]})
     year = timezone.localdate().year
@@ -279,11 +321,14 @@ def record_payment(ctx: ActorContext, invoice: Invoice, *, amount, method: str, 
 
 def request_discount(ctx: ActorContext, invoice: Invoice, *, amount, reason: str) -> ApprovalRequest:
     amount = money(amount)
-    if invoice.status not in (Invoice.Status.DRAFT, Invoice.Status.ISSUED, Invoice.Status.PARTIAL):
-        raise ConflictError("Discounts can only be requested on open invoices.")
+    if invoice.status not in OPEN_STATUSES:
+        raise ConflictError("Discounts can only be requested on open invoices. For a paid invoice, request a refund "
+                            "from the receipt instead.")
     if amount <= 0 or amount > invoice.subtotal:
         raise BusinessValidationError("Discount must be between 0 and the invoice subtotal.",
                                       fields={"amount": ["Out of range."]})
+    if problem := discount_problem(invoice, amount):
+        raise ConflictError(problem, fields={"amount": ["Too large for what is still unpaid."]})
     return approvals.request_approval(ctx, kind=ApprovalRequest.Kind.DISCOUNT, object_type="invoice",
                                       object_id=invoice.pk, amount=amount, reason=reason,
                                       summary=f"Discount of {amount} ETB on {invoice.number} "
@@ -295,12 +340,9 @@ def apply_discount(ctx: ActorContext, invoice: Invoice, approval_id) -> Invoice:
     invoice = _lock(invoice)
     approval = approvals.consume(ctx, approval_id, kind=ApprovalRequest.Kind.DISCOUNT, object_type="invoice",
                                  object_id=invoice.pk)
-    if invoice.status not in (Invoice.Status.DRAFT, Invoice.Status.ISSUED, Invoice.Status.PARTIAL):
-        raise ConflictError("This invoice is closed.")
-    new_discount = invoice.discount_amount + approval.amount
-    if invoice.subtotal - new_discount < invoice.amount_paid:
-        raise ConflictError("The discount would make the total less than what has already been paid.")
-    invoice.discount_amount = new_discount
+    if problem := discount_problem(invoice, approval.amount):
+        raise ConflictError(problem)
+    invoice.discount_amount = invoice.discount_amount + approval.amount
     invoice.discount_approval = approval
     _recalculate(invoice)
     if invoice.status != Invoice.Status.DRAFT:
@@ -402,10 +444,10 @@ def save_service(ctx: ActorContext, data: dict, service: ServicePrice | None = N
     changes = {}
     for key in SERVICE_FIELDS:
         if key in data and (creating or getattr(service, key) != data[key]):
-            changes[key] = str(data[key])
+            changes[key] = str(data[key]) if creating else {"from": str(getattr(service, key)), "to": str(data[key])}
             setattr(service, key, data[key])
     service.full_clean()
     service.save()
     record_event(ctx, action="price.create" if creating else "price.update", object_type="service_price",
-                 object_id=service.pk, details=changes)
+                 object_id=service.pk, details={"code": service.code, "name": service.name, "changes": changes})
     return service

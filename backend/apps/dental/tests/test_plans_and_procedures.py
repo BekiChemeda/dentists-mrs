@@ -411,3 +411,16 @@ def test_declining_the_deferred_item_completes_the_plan(dental, exam, catalog_da
                                   {"decisions": {ext["id"]: "declined"}}, format="json"))
     assert plan["status"] == "completed"
     assert {i["status"] for i in plan["items"]} == {"completed", "declined"}
+
+
+def test_procedure_price_edits_are_audited_with_before_and_after(dental, catalog_data):
+    from apps.audit.models import AuditEvent
+
+    for price in ("501", "500"):
+        _price(dental, catalog_data, "OS-EXT", price)
+    events = AuditEvent.objects.filter(action="dental_procedure_type.update").order_by("occurred_at")
+    trail = [e.details["changes"]["price"] for e in events if "price" in e.details["changes"]]
+    assert trail[-2:][1] == {"from": "501.00", "to": "500.00"}
+    assert trail[-2:][0]["to"] == "501.00"
+    # Fields that did not change are not reported as changes.
+    assert set(events.last().details["changes"]) == {"price"}

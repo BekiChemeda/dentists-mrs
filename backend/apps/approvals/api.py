@@ -16,12 +16,19 @@ class ApprovalSerializer(serializers.ModelSerializer):
     decided_by = UserBrief(read_only=True)
     kind_label = serializers.CharField(source="get_kind_display", read_only=True)
     can_decide = serializers.SerializerMethodField()
+    problem = serializers.SerializerMethodField()
 
     class Meta:
         model = ApprovalRequest
         fields = ["id", "kind", "kind_label", "status", "object_type", "object_id", "summary", "amount", "quantity",
                   "reason", "requested_by", "decided_by", "decided_at", "decision_note", "used_at", "created_at",
-                  "can_decide"]
+                  "can_decide", "problem"]
+
+    def get_problem(self, obj) -> str | None:
+        """For open requests: why approving or applying it would now fail (e.g. the invoice was paid)."""
+        if obj.status not in (ApprovalRequest.Status.PENDING, ApprovalRequest.Status.APPROVED):
+            return None
+        return services.blocking_problem(obj)
 
     def get_can_decide(self, obj) -> bool:
         user = self.context["request"].user

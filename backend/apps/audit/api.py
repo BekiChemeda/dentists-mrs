@@ -61,7 +61,12 @@ class AuditEventListView(ListAPIView):
         if not self.request.user.has_permissions(["audit.view"]):
             # audit.operational: clinic work only. Sign-ins, account, role, security and system events
             # stay with the system administrator.
-            for prefix in SECURITY_ACTION_PREFIXES:
+            # Staff managers still see the staff accounts they create and change (user.*), but not sign-ins,
+            # roles, sessions or system events.
+            hidden = SECURITY_ACTION_PREFIXES
+            if self.request.user.has_permissions(["staff.manage"]):
+                hidden = tuple(p for p in hidden if p != "user.")
+            for prefix in hidden:
                 qs = qs.exclude(action__startswith=prefix)
         if "actor" in f:
             qs = qs.filter(actor_id=f["actor"])

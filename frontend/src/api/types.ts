@@ -804,6 +804,8 @@ export interface Approval {
   decision_note: string;
   created_at: string;
   can_decide: boolean;
+  /** Why approving or applying this request would now fail (e.g. the invoice is already paid). */
+  problem?: string | null;
 }
 
 export interface ServicePrice {

@@ -114,6 +114,7 @@ export function AuditPage() {
                     {open === e.id && (
                       <tr>
                         <td colSpan={6}>
+                          <ChangeList details={e.details} />
                           <pre className="small" style={{ whiteSpace: "pre-wrap", margin: 0 }}>
                             {JSON.stringify(e.details, null, 2)}
                           </pre>
@@ -130,5 +131,25 @@ export function AuditPage() {
         {events.data && <Pager page={page} count={events.data.count} pageSize={50} onPage={setPage} />}
       </Panel>
     </div>
+  );
+}
+
+// "price: 500.00 → 501.00" lines for events that record before and after values.
+function ChangeList({ details }: { details: Record<string, unknown> }) {
+  const changes = details.changes;
+  if (!changes || typeof changes !== "object") return null;
+  const rows = Object.entries(changes as Record<string, unknown>).filter(
+    ([, v]) => v !== null && typeof v === "object" && "from" in (v as object) && "to" in (v as object),
+  ) as [string, { from: unknown; to: unknown }][];
+  if (!rows.length) return null;
+  const show = (v: unknown) => (v === null || v === "" ? "—" : Array.isArray(v) ? v.join(", ") : String(v));
+  return (
+    <ul className="small" style={{ margin: "0 0 0.5rem", paddingLeft: "1.2rem" }}>
+      {rows.map(([field, v]) => (
+        <li key={field}>
+          <strong>{field}</strong>: {show(v.from)} → {show(v.to)}
+        </li>
+      ))}
+    </ul>
   );
 }
