@@ -16,7 +16,10 @@ examinations**, **Recalls**, **Orthodontics**, **Dental laboratory**, **Reports*
 - *Dashboard*: who is waiting, **Your unsigned examinations** (with **Continue writing**), and today's appointments.
 - *My dental examinations*: your examinations with the patient's name, complaint and diagnoses. It opens on those not
   signed yet; choose *Signed* or *All examinations* to see the rest.
-- **Manage** on the waiting list starts the examination (or opens yours if it is already started).
+- **Start examination** on the waiting list starts it; **Continue examination** opens one you already started.
+  **Call next** calls the next patient assigned to you or to any dentist; patients assigned to another dentist
+  are left for them.
+- If you try to leave a page, or sign out, with typing that is not saved, the system asks first.
 
 The page header shows the patient (name, MRN, sex, age) and an **Alerts** line: allergies, any *yes* answers from the
 medical history, and when it was last reviewed. The line is red only when there is something to warn about. It stays on every tab.
@@ -29,7 +32,7 @@ medical history, and when it was last reviewed. The line is red only when there 
 | **Examination** | Chief complaint, history, the patient's own words, pain (teeth, severity 0–10, pattern, sensitivity, onset, triggers), extraoral and intraoral findings, assessment, proposed treatment, discussion, consent notes, follow-up instructions. **Mark the rest normal** writes *Normal* in every extraoral or intraoral field you left empty; change any that are not. **Save** (the tab shows • while something is unsaved; you cannot sign until it is saved). |
 | **Chart** | The dental chart (see §3). |
 | **Periodontal** | Six sites per tooth (see §4). Only if the clinic uses it. |
-| **Diagnoses** | Search a term (for example *K02*, *caries*, *pulpitis*), choose where (tooth, surfaces, region, whole mouth), certainty, notes, **Add diagnosis**. |
+| **Diagnoses** | Search a term (for example *K02*, *caries*, *pulpitis*) and click it in the list. The button then names it (**Add K04.0 Pulpitis**), so you can see what will be added. Choose where (tooth, surfaces, region, whole mouth), certainty, notes. |
 | **Treatment plan** | Plans and estimates (see §5). |
 | **Procedures** | Procedure records for this visit (see §6). |
 | **Prescriptions** | Medicines from the catalogue: dose, frequency, days, quantity, instructions. If the clinic has no pharmacy the prescription is printed for an outside pharmacy. The system never suggests doses. |

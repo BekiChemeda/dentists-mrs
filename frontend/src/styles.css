@@ -3869,3 +3869,51 @@ fieldset.form-group > legend {
     overflow-wrap: anywhere;
   }
 }
+
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sidebar-close {
+  display: none !important;
+}
+@media (max-width: 850px) {
+  .sidebar-close {
+    display: inline-grid !important;
+  }
+}
+
+/* A short list to choose one item from: works the same with a mouse, a finger or a keyboard. */
+.pick-list {
+  display: grid;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.pick-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 9px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.pick-item:last-child {
+  border-bottom: 0;
+}
+.pick-item:hover {
+  background: var(--hover);
+}
+.pick-item[aria-checked="true"] {
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  box-shadow: inset 3px 0 0 var(--brand);
+  font-weight: 600;
+}

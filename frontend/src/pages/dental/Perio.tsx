@@ -13,6 +13,7 @@ import { formatDateTime } from "../../lib/format";
 import { LOWER_PERMANENT, UPPER_PERMANENT, canHaveFurcation } from "../../lib/teeth";
 import { ClinicHeader } from "../common";
 import type { Finding, PerioExam, PerioSite, PerioTooth } from "./types";
+import { useUnsavedGuard } from "../../lib/unsaved";
 
 const BUCCAL = ["MB", "B", "DB"];
 const LINGUAL = ["ML", "L", "DL"];
@@ -33,10 +34,37 @@ function emptyTooth(tooth: number): PerioTooth {
   };
 }
 
-function toInt(v: string): number | null {
-  if (v.trim() === "") return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : NaN;
+/** A whole number of millimetres. Only digits (and a leading minus while typing) are accepted. */
+function MmInput({
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: number | null | undefined;
+  disabled?: boolean;
+  onChange: (v: number | null) => void;
+}) {
+  const [text, setText] = useState(value == null ? "" : String(value));
+  useEffect(() => {
+    setText((cur) => (cur === "-" && value == null ? cur : value == null ? "" : String(value)));
+  }, [value]);
+  return (
+    <input
+      aria-label={label}
+      className="perio-input"
+      inputMode="numeric"
+      disabled={disabled}
+      value={text}
+      onChange={(e) => {
+        const v = e.target.value.trim();
+        if (!/^-?\d{0,2}$/.test(v)) return;
+        setText(v);
+        onChange(v === "" || v === "-" ? null : Number(v));
+      }}
+    />
+  );
 }
 
 function SiteCells({
@@ -70,21 +98,17 @@ function SiteCells({
         }
         return (
           <td key={site} className="perio-site">
-            <input
-              aria-label={`${label} probing depth (mm)`}
-              className="perio-input"
-              inputMode="numeric"
+            <MmInput
+              label={`${label} probing depth (mm)`}
               disabled={off || s?.not_measured}
-              value={s?.probing_depth_mm ?? ""}
-              onChange={(e) => onChange(site, { probing_depth_mm: toInt(e.target.value) })}
+              value={s?.probing_depth_mm}
+              onChange={(v) => onChange(site, { probing_depth_mm: v })}
             />
-            <input
-              aria-label={`${label} gingival margin (mm)`}
-              className="perio-input"
-              inputMode="numeric"
+            <MmInput
+              label={`${label} gingival margin (mm)`}
               disabled={off || s?.not_measured}
-              value={s?.gingival_margin_mm ?? ""}
-              onChange={(e) => onChange(site, { gingival_margin_mm: toInt(e.target.value) })}
+              value={s?.gingival_margin_mm}
+              onChange={(v) => onChange(site, { gingival_margin_mm: v })}
             />
             <label className="perio-flag" title="Bleeding on probing">
               <input
@@ -128,6 +152,7 @@ export function PerioChart({
   const exam = useGet<PerioExam | null>(["dental", "perio", encounterId], `/dental/encounters/${encounterId}/perio/`);
   const [draft, setDraft] = useState<Draft>({});
   const [dirty, setDirty] = useState(false);
+  useUnsavedGuard("perio", dirty);
   const [arch, setArch] = useState<"upper" | "lower">("upper");
   // A new periodontal chart starts from the dental chart: teeth recorded as missing, extracted, unerupted or
   // impacted are pre-marked missing, and implants as implants. The examiner can change any of them before saving.

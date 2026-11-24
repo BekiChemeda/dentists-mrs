@@ -31,10 +31,8 @@ CITIES = [("Oromia", "Adama"), ("Addis Ababa", "Addis Ababa"), ("Sidama", "Hawas
           ("Oromia", "Bishoftu"), ("Dire Dawa", "Dire Dawa"), ("Tigray", "Mekelle"), ("Oromia", "Jimma")]
 
 # username, first, last, role, department code
+# A dental clinic: no general doctor, nurse, laboratory or pharmacy accounts.
 DEMO_STAFF = [("reception", "Hirut", "Desta", "receptionist", "reception"),
-              ("nurse", "Meseret", "Alemu", "nurse", "triage"), ("doctor", "Dawit", "Haile", "doctor", "opd1"),
-              ("lab", "Bereket", "Girma", "lab_technician", "laboratory"),
-              ("pharmacy", "Saba", "Negash", "pharmacist", "pharmacy"),
               ("cashier", "Liya", "Tadesse", "cashier", "finance"),
               ("store", "Yonas", "Fikre", "inventory_manager", "pharmacy"),
               ("manager", "Rahel", "Wolde", "clinic_admin", "administration"),
@@ -47,6 +45,30 @@ DEMO_STAFF = [("reception", "Hirut", "Desta", "receptionist", "reception"),
               ("dentaltech", "Biruk", "Lemma", "dental_technician", "dental"),
               ("imaging", "Kidist", "Haile", "imaging_staff", "dental")]
 DEMO_PASSWORD = "Demo-Clinic-2026"
+
+
+# Plausible demo prices in ETB, so a plan or invoice looks believable. Synthetic: not a price list.
+DEMO_DENTAL_PRICES = {
+    "EX-EMG": 300, "EX-NEW": 500, "EX-REV": 300, "IMG-PA": 300, "IMG-BW": 400, "IMG-OPG": 1200,
+    "PR-SCL": 1200, "PR-FLU": 500, "PR-SEAL": 600, "PE-EXAM": 600, "PE-SRP": 1500,
+    "RS-TEMP": 500, "RS-GIC": 1000, "RS-COMP1": 1500, "RS-COMP2": 2500,
+    "EN-PULP": 2500, "EN-RCT": 7000, "EN-RERCT": 9000, "OS-EXT": 1000, "OS-SEXT": 3500,
+    "PS-CRPREP": 9000, "PS-CRFIT": 3000, "PS-BRIDGE": 25000, "PS-DENT": 15000, "PS-DREP": 2000,
+    "IM-CONS": 800, "CO-WHITE": 6000,
+    "OR-CONS": 800, "OR-REC": 2500, "OR-BOND": 12000, "OR-ADJ": 1200, "OR-DEBOND": 3000, "OR-RET": 4000,
+}
+
+
+def set_demo_dental_prices(only_unpriced: bool) -> int:
+    from apps.dental.models import DentalProcedure
+
+    changed = 0
+    for code, price in DEMO_DENTAL_PRICES.items():
+        qs = DentalProcedure.objects.filter(code=code)
+        if only_unpriced:
+            qs = qs.filter(price=0)
+        changed += qs.update(price=Decimal(price))
+    return changed
 
 
 class Command(BaseCommand):
@@ -78,11 +100,7 @@ class Command(BaseCommand):
 
     def _dental_prices(self, rng):
         """Demo prices for the starter procedures, which ship at 0 for the clinic to set. Synthetic only."""
-        from apps.dental.models import DentalProcedure
-
-        for proc in DentalProcedure.objects.filter(price=0):
-            DentalProcedure.objects.filter(pk=proc.pk).update(price=Decimal(rng.choice([150, 300, 500, 800, 1500,
-                                                                                        2500, 4000])))
+        set_demo_dental_prices(only_unpriced=True)
 
     def _staff(self):
         from apps.accounts.models import Department, Room

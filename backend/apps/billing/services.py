@@ -201,8 +201,9 @@ def add_pending_charges(ctx: ActorContext, invoice: Invoice) -> int:
     else:
         pending = unbilled_patient_charges(invoice.patient_id)
         if not pending:
-            raise ConflictError("Link the invoice to a visit to collect its charges. Without a visit, only "
-                                "orthodontic instalments that are due can be collected.")
+            raise ConflictError("This invoice is not linked to a visit, so the visit's charges cannot be added. "
+                                "Cancel it and create a new invoice with the visit chosen. (An invoice without "
+                                "a visit can only collect orthodontic instalments that are due.)")
     added = 0
     for charge in pending:
         _add_line(invoice, **charge)

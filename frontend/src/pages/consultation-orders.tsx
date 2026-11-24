@@ -13,7 +13,7 @@ import {
   type Paginated,
   type StockItem,
 } from "../api/types";
-import { FLAG_LABEL, FREQUENCIES, StateBadge } from "../labels";
+import { FLAG_LABEL, FREQUENCIES, FREQUENCY_LABELS, StateBadge } from "../labels";
 import { Badge, Banner, ErrorBanner, Field, Loading, Panel } from "../ui";
 import { CriticalNote } from "./common";
 
@@ -405,7 +405,7 @@ export function PrescriptionForm({ encounterId, onDone }: { encounterId: string;
                 <option value="">{t("rx.choose", "Choose")}</option>
                 {FREQUENCIES.map((f) => (
                   <option key={f} value={f}>
-                    {f}
+                    {FREQUENCY_LABELS[f] ?? f}
                   </option>
                 ))}
               </select>

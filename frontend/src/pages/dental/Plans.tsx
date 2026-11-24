@@ -378,6 +378,14 @@ function AddItemForm({
           <input id="f-reason" value={reason} onChange={(e) => setReason(e.target.value)} required />
         </Field>
       )}
+      {proc && (
+        <Banner tone="info">
+          {t("dental.will_add", "Will add: {{name}}, {{fee}} ETB", {
+            name: proc.name,
+            fee: money(fee === "" ? proc.price : fee),
+          })}
+        </Banner>
+      )}
       <div className="form-actions">
         <button type="button" className="btn" onClick={onDone}>
           {t("common.cancel")}

@@ -419,13 +419,39 @@ class VisitEventSerializer(serializers.ModelSerializer):
         fields = ["id", "at", "actor", "kind", "summary"]
 
 
+# Timeline entries whose wording names diagnoses, medicines, procedures, teeth or results. Staff without clinical
+# access (reception, cashier, store, imaging) see that something happened, not what.
+CLINICAL_EVENT_PREFIXES = ("prescription", "pharmacy.", "lab", "referral", "consultation", "certificate", "dental.")
+CLINICAL_EVENT_KINDS = {"triage"}  # vital signs; "triage.skipped" only says triage was skipped
+CLINICAL_EVENT_LABELS = {"prescription": "Prescription written", "pharmacy.": "Medicines dispensed",
+                         "lab": "Laboratory step recorded", "referral": "Referral recorded",
+                         "triage": "Triage recorded", "consultation": "Consultation step recorded",
+                         "certificate": "Certificate issued", "dental.procedure": "Dental procedure recorded",
+                         "dental.": "Dental examination step recorded"}
+CLINICAL_VIEW = ["clinical.view", "clinical.write", "dental.view", "dental.write", "lab.view", "pharmacy.view",
+                 "triage.record"]
+
+
+def _generic(kind: str) -> str:
+    for prefix in sorted(CLINICAL_EVENT_LABELS, key=len, reverse=True):
+        if kind.startswith(prefix):
+            return CLINICAL_EVENT_LABELS[prefix]
+    return "Clinical step recorded"
+
+
 class VisitTimelineView(PermissionedView):
     required_permissions = {"GET": ("patients.view",)}
 
     def get(self, request, pk):
         visit = get_object_or_404(Visit, pk=pk)
         events = VisitEvent.objects.filter(visit=visit).select_related("actor")
-        return Response(VisitEventSerializer(events, many=True).data)
+        data = VisitEventSerializer(events, many=True).data
+        if not request.user.has_any_permission(CLINICAL_VIEW):
+            for row in data:
+                kind = str(row.get("kind", ""))
+                if kind in CLINICAL_EVENT_KINDS or kind.startswith(CLINICAL_EVENT_PREFIXES):
+                    row["summary"] = _generic(row["kind"])
+        return Response(data)
 
 
 class VisitOutstandingView(PermissionedView):

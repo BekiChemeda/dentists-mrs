@@ -267,7 +267,7 @@ function LabCasesBlock() {
   const { t } = useTranslation();
   const q = useGet<
     Paginated<{ id: string; number: string; patient: PatientBrief; case_type_label: string; due_date: string | null }>
-  >(["dental", "lab-cases", "dash"], "/dental/lab-cases/");
+  >(["dental", "lab-cases", "dash"], "/dental/lab-cases/", { refetchInterval: 60_000 });
   const rows = q.data?.results ?? [];
   const today = todayIso();
   return (

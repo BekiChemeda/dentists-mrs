@@ -15,7 +15,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { Banner, ErrorBanner, Field, Loading, Modal, PageHead, Panel, Tabs, printElement, toast } from "../../ui";
 import { formatDateTime } from "../../lib/format";
 import { ClinicHeader, sexAge } from "../common";
-import { FREQUENCIES } from "../../labels";
+import { FREQUENCIES, FREQUENCY_LABELS, qty } from "../../labels";
 import { ChartView } from "./ChartView";
 import { DentalStatus, NOTE_GROUPS, NOTE_LABEL, useDentalCatalog } from "./common";
 import { ImagesPanel } from "./Images";
@@ -24,6 +24,7 @@ import { PerioChart } from "./Perio";
 import { PlanList, LocationInputs, locationBody } from "./Plans";
 import { AmendReason, EncounterProcedures } from "./Procedures";
 import type { DentalEncounter, DentalSummary, DiagnosisTerm, RiskReview } from "./types";
+import { useUnsavedGuard } from "../../lib/unsaved";
 
 type Tab =
   "history" | "exam" | "chart" | "perio" | "diagnoses" | "plan" | "procedures" | "rx" | "images" | "ortho" | "sign";
@@ -210,6 +211,20 @@ function HistoryTab({
                 when: formatDateTime(last.reviewed_at),
               })}
               {last.changed_since_previous === true && ` · ${t("dental.changed", "changed since the review before")}`}
+              <br />
+              {last.allergies_reviewed
+                ? t("dental.last_allergies_yes", "Allergies checked with the patient")
+                : t("dental.last_allergies_no", "Allergies not checked")}
+              {" · "}
+              {last.medications_reviewed
+                ? t("dental.last_meds_yes", "Medicines checked with the patient")
+                : t("dental.last_meds_no", "Medicines not checked")}
+              {last.notes && (
+                <>
+                  <br />
+                  {t("dental.last_notes", "Notes: {{n}}", { n: last.notes })}
+                </>
+              )}
             </p>
           )}
           <Banner tone="info">
@@ -251,6 +266,12 @@ function HistoryTab({
             })}
             {writable && (
               <>
+                <p className="small muted">
+                  {t(
+                    "dental.review_each_time",
+                    "Each review is saved with today's date. The most recent one is shown at the top of this panel.",
+                  )}
+                </p>
                 <label className="check">
                   <input type="checkbox" checked={allergies} onChange={(e) => setAllergies(e.target.checked)} />{" "}
                   {t("dental.allergies_checked", "Allergies checked with the patient")}
@@ -458,12 +479,8 @@ function ExamTab({
   }, [initial, dirty]);
   useEffect(() => {
     onDirty(dirty);
-    const warn = (ev: BeforeUnloadEvent) => {
-      if (dirty) ev.preventDefault();
-    };
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
   }, [dirty, onDirty]);
+  useUnsavedGuard(`exam-${encounter.id}`, dirty);
   const save = useMutation({
     mutationFn: () =>
       api.patch<DentalEncounter>(`/dental/encounters/${encounter.id}/`, {
@@ -667,8 +684,20 @@ function DiagnosesTab({ encounter, writable }: { encounter: DentalEncounter; wri
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [q, setQ] = useState("");
-  const terms = useGet<DiagnosisTerm[]>(["dental", "terms", q], `/dental/diagnosis-terms/${queryString({ q })}`);
   const [termId, setTermId] = useState("");
+  // Wait until typing pauses before searching, so the list does not change under the pointer.
+  const [debouncedQ, setDebouncedQ] = useState("");
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebouncedQ(q.trim()), 250);
+    return () => window.clearTimeout(id);
+  }, [q]);
+  const terms = useGet<DiagnosisTerm[]>(
+    ["dental", "terms", debouncedQ],
+    `/dental/diagnosis-terms/${queryString({ q: debouncedQ })}`,
+  );
+  const searching = q.trim() !== debouncedQ || terms.isFetching;
+  // Only a term that is visible in the list can be added: never a hidden earlier choice.
+  const chosen = searching ? undefined : (terms.data ?? []).find((tm) => tm.id === termId);
   const [loc, setLoc] = useState({ scope: "tooth", tooth: "", surfaces: [] as string[], region: "q1" });
   const [certainty, setCertainty] = useState("confirmed");
   const [notes, setNotes] = useState("");
@@ -676,7 +705,7 @@ function DiagnosesTab({ encounter, writable }: { encounter: DentalEncounter; wri
   const add = useMutation({
     mutationFn: () =>
       api.post(`/dental/encounters/${encounter.id}/diagnoses/`, {
-        term_id: termId,
+        term_id: chosen?.id,
         ...locationBody(loc),
         certainty,
         notes,
@@ -684,6 +713,7 @@ function DiagnosesTab({ encounter, writable }: { encounter: DentalEncounter; wri
     onSuccess: () => {
       refresh();
       setNotes("");
+      setTermId("");
       toast(t("dental.dx_added", "Diagnosis added"));
     },
   });
@@ -742,15 +772,28 @@ function DiagnosesTab({ encounter, writable }: { encounter: DentalEncounter; wri
             <Field label={t("dental.search", "Search")} id="f-q">
               <input id="f-q" value={q} onChange={(e) => setQ(e.target.value)} placeholder="K02, caries, pulpitis…" />
             </Field>
-            <Field label={t("dental.diagnosis", "Diagnosis")} id="f-term_id" error={add.error}>
-              <select id="f-term_id" value={termId} onChange={(e) => setTermId(e.target.value)} required size={6}>
+            <div className="field">
+              <span className="label" id="f-term-label">
+                {t("dental.diagnosis", "Diagnosis")}
+              </span>
+              <div className="pick-list" role="radiogroup" aria-labelledby="f-term-label" aria-busy={searching}>
                 {(terms.data ?? []).map((tm) => (
-                  <option key={tm.id} value={tm.id}>
-                    {tm.code} {tm.term}
-                  </option>
+                  <button
+                    key={tm.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={chosen?.id === tm.id}
+                    className="pick-item"
+                    onClick={() => setTermId(tm.id)}
+                  >
+                    <span className="mono">{tm.code}</span> {tm.term}
+                  </button>
                 ))}
-              </select>
-            </Field>
+              </div>
+            </div>
+            {!searching && !terms.data?.length && (
+              <p className="small muted">{t("dental.no_terms", "No diagnosis matches this search.")}</p>
+            )}
             <LocationInputs procedure={anyProc} value={loc} onChange={setLoc} />
             <Field label={t("dental.certainty", "Certainty")} id="f-certainty">
               <select id="f-certainty" value={certainty} onChange={(e) => setCertainty(e.target.value)}>
@@ -762,8 +805,10 @@ function DiagnosesTab({ encounter, writable }: { encounter: DentalEncounter; wri
               <input id="f-dx-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
             </Field>
             <div className="form-actions">
-              <button className="btn btn-primary" disabled={add.isPending || !termId}>
-                {t("dental.add_dx", "Add diagnosis")}
+              <button className="btn btn-primary" disabled={add.isPending || !chosen}>
+                {chosen
+                  ? t("dental.add_dx_named", "Add {{code}} {{term}}", { code: chosen.code, term: chosen.term })
+                  : t("dental.choose_dx", "Choose a diagnosis")}
               </button>
             </div>
           </form>
@@ -858,8 +903,10 @@ function PrescriptionsTab({ encounter, writable }: { encounter: DentalEncounter;
                 <ul>
                   {rx.items.map((it, i) => (
                     <li key={i}>
-                      {it.drug_name} — {it.dose} {it.frequency}
-                      {it.duration_days ? ` × ${it.duration_days} days` : ""} ({it.quantity}) {it.instructions}
+                      {it.drug_name} — {it.dose},{" "}
+                      {(FREQUENCY_LABELS[it.frequency] ?? it.frequency).replace(/^[A-Za-z]+: /, "")}
+                      {it.duration_days ? `, ${it.duration_days} days` : ""} ({t("dental.qty", "quantity")}{" "}
+                      {qty(it.quantity)}) {it.instructions}
                     </li>
                   ))}
                 </ul>
@@ -911,7 +958,9 @@ function PrescriptionsTab({ encounter, writable }: { encounter: DentalEncounter;
               <Field label={t("dental.frequency", "Frequency")} id={`f-freq-${i}`}>
                 <select id={`f-freq-${i}`} value={l.frequency} onChange={(e) => set(i, { frequency: e.target.value })}>
                   {FREQUENCIES.map((fq) => (
-                    <option key={fq}>{fq}</option>
+                    <option key={fq} value={fq}>
+                      {FREQUENCY_LABELS[fq] ?? fq}
+                    </option>
                   ))}
                 </select>
               </Field>

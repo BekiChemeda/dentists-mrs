@@ -13,7 +13,7 @@ Your menu: **Dashboard**, **Patients**, **Waiting list**, **Appointments**, **Ca
 - *My visits*: **Waiting for you**, your **Unsigned notes**, and **Recently signed** notes.
 - The **Dashboard** shows critical laboratory results you have not yet acknowledged.
 
-Click **Manage** to open the visit. The patient banner at the top (name, MRN, age, sex, allergies)
+Click **Start examination** (or **Continue examination**) to open the visit. The patient banner at the top (name, MRN, age, sex, allergies)
 stays on every page of the visit, so you always know whose record you are in.
 
 ## 2. The visit page

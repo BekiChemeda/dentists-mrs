@@ -42,14 +42,16 @@ import {
   BellRing,
   Hammer,
   Sparkles,
+  ScanLine,
 } from "lucide-react";
 import { api, queryString } from "../api/client";
 import { useAction, useGet } from "../api/hooks";
 import type { Notice, Paginated, Patient, Visit } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { formatDateTime } from "../lib/format";
+import { clearUnsaved, hasUnsaved } from "../lib/unsaved";
 import { NAV_ITEMS, visibleNavItems, type NavGroup } from "../navigation";
-import { Toaster, initials, Loading } from "../ui";
+import { ConfirmDialog, Toaster, initials, Loading } from "../ui";
 import { MaintenanceStrip } from "../pages/system";
 import { logoSrc, useClinic } from "../pages/common";
 import { useTheme, type ThemeChoice } from "../lib/theme";
@@ -80,6 +82,7 @@ const ICONS: Record<string, typeof Users> = {
   dental_encounters: Smile,
   recalls: BellRing,
   ortho: Sparkles,
+  dental_imaging: ScanLine,
   lab_cases: Hammer,
   dental_catalogue: Tags,
 };
@@ -91,9 +94,25 @@ export function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [leave, setLeave] = useState<null | (() => void)>(null);
   useEffect(() => {
     setMenuOpen(false);
   }, [location.pathname]);
+  // Following any link inside the app while a form has unsaved work asks first.
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (!hasUnsaved() || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
+      const a = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!a || a.target === "_blank" || a.origin !== window.location.origin) return;
+      const to = a.pathname + a.search + a.hash;
+      if (a.pathname + a.search === window.location.pathname + window.location.search) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setLeave(() => () => navigate(to));
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [navigate]);
   useEffect(() => {
     if (!menuOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -111,14 +130,36 @@ export function AppShell() {
     );
 
   const items = visibleNavItems(user.permissions, user.modules_off ?? []);
-  const onLogout = async () => {
+  const doLogout = async () => {
+    clearUnsaved();
     await logout();
     navigate("/login", { replace: true });
+  };
+  const onLogout = () => {
+    if (hasUnsaved()) setLeave(() => () => void doLogout());
+    else void doLogout();
   };
   const roleNames = user.roles.map((r) => r.name).join(", ");
 
   return (
     <div className="shell">
+      <ConfirmDialog
+        open={leave !== null}
+        title={t("shell.unsaved_title", "You have unsaved changes")}
+        body={t(
+          "shell.unsaved_body",
+          "What you typed has not been saved yet. Go back and press Save, or leave and lose it.",
+        )}
+        confirmLabel={t("shell.leave_unsaved", "Leave without saving")}
+        danger
+        onClose={() => setLeave(null)}
+        onConfirm={() => {
+          const go = leave;
+          clearUnsaved();
+          setLeave(null);
+          go?.();
+        }}
+      />
       <a className="skip-link" href="#main">
         Skip to content
       </a>
@@ -127,8 +168,18 @@ export function AppShell() {
         className={`sidebar${menuOpen ? " sidebar-open" : ""}`}
         aria-label={t("nav.main", "Main navigation")}
       >
-        <Brand />
-        <nav>
+        <div className="sidebar-head">
+          <Brand />
+          <button
+            type="button"
+            className="icon-button sidebar-close"
+            aria-label={t("shell.close_menu", "Close menu")}
+            onClick={() => setMenuOpen(false)}
+          >
+            <X size={21} />
+          </button>
+        </div>
+        <nav onClick={() => setMenuOpen(false)}>
           {GROUPS.map((group) => {
             const groupItems = items.filter((i) => i.group === group);
             if (!groupItems.length) return null;

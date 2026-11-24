@@ -67,7 +67,8 @@ export function ErrorBanner({ error, onReload }: { error: unknown; onReload?: ()
   if (!error) return null;
   if (isEditConflict(error)) return <ConflictNotice error={error} onReload={onReload} />;
   const message = error instanceof Error ? error.message : String(error);
-  const ref = error instanceof ApiError ? error.requestId : undefined;
+  // A reference number only helps support with an unexpected failure, not with a message the user can act on.
+  const ref = error instanceof ApiError && (error.status >= 500 || error.status === 0) ? error.requestId : undefined;
   return (
     <Banner tone="error">
       {message}

@@ -115,7 +115,7 @@ export function QueuePage() {
               n: r.visit.queue_number,
               name: r.visit.patient.full_name,
             })
-          : t("queue.nobody", "Nobody is waiting."),
+          : t("queue.nobody", "No patient is waiting for you. Patients assigned to another dentist are not included."),
       ),
     false,
   );
@@ -235,14 +235,14 @@ export function QueuePage() {
     if ((v.status === "waiting_doctor" || v.status === "waiting_triage") && clinician && mineOrFree) {
       return (
         <button className="btn btn-sm btn-primary" disabled={start.isPending} onClick={() => start.mutate(v.id)}>
-          <Stethoscope size={15} aria-hidden /> {t("queue.manage", "Manage")}
+          <Stethoscope size={15} aria-hidden /> {t("queue.start_exam", "Start examination")}
         </button>
       );
     }
     if (v.status === "in_consultation" && clinician && v.assigned_doctor?.id === user?.id) {
       return (
         <button className="btn btn-sm btn-primary" onClick={() => start.mutate(v.id)}>
-          <Stethoscope size={15} aria-hidden /> {t("queue.manage", "Manage")}
+          <Stethoscope size={15} aria-hidden /> {t("queue.continue_exam", "Continue examination")}
         </button>
       );
     }
@@ -256,7 +256,7 @@ export function QueuePage() {
     if (v.status === "after_consult" && mine) {
       return (
         <Link className="btn btn-sm btn-primary" to={workspace(mine.id)}>
-          <Stethoscope size={15} aria-hidden /> {t("queue.manage", "Manage")}
+          <Stethoscope size={15} aria-hidden /> {t("queue.open_exam", "Open examination")}
         </Link>
       );
     }
@@ -430,35 +430,52 @@ export function QueuePage() {
               )}
               {tab === "doctor" && (
                 <>
-                  {head([
-                    t("queue.triage_time", "Triage time"),
-                    t("queue.sent_to", "Sent to"),
-                    t("queue.diagnosis", "Diagnosis"),
-                  ])}
+                  {head(
+                    triageOn
+                      ? [
+                          t("queue.triage_time", "Triage time"),
+                          t("queue.sent_to", "Sent to"),
+                          t("queue.diagnosis", "Diagnosis"),
+                        ]
+                      : [t("queue.arrived", "Arrived"), t("queue.doctor", "Doctor"), t("queue.diagnosis", "Diagnosis")],
+                  )}
                   <tbody>
                     {rows.map((v, i) => (
                       <tr key={v.id} className={`prio-${v.priority}`}>
                         {common(v, i)}
-                        <td>
-                          {v.triage ? (
-                            timeOf(v.triage.recorded_at)
-                          ) : (
-                            <span className="subtle">{t("queue.not_triaged", "Not triaged")}</span>
-                          )}
-                        </td>
-                        <td>
-                          {v.department || v.triage?.triage_to
-                            ? triageLabel(v.department || v.triage?.triage_to || "")
-                            : "—"}
-                          {v.internal_referral && (
-                            <div className="small referral-note" title={v.internal_referral.reason}>
-                              {t("queue.referred_from", "Referred from {{from}} by Dr. {{who}}", {
-                                from: triageLabel(v.internal_referral.from_department),
-                                who: v.internal_referral.referred_by,
-                              })}
-                            </div>
-                          )}
-                        </td>
+                        {!triageOn ? (
+                          <>
+                            <td>{timeOf(v.arrived_at)}</td>
+                            <td>
+                              {v.assigned_doctor
+                                ? `Dr. ${v.assigned_doctor.full_name}`
+                                : t("queue.any_doctor", "Any doctor")}
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td>
+                              {v.triage ? (
+                                timeOf(v.triage.recorded_at)
+                              ) : (
+                                <span className="subtle">{t("queue.not_triaged", "Not triaged")}</span>
+                              )}
+                            </td>
+                            <td>
+                              {v.department || v.triage?.triage_to
+                                ? triageLabel(v.department || v.triage?.triage_to || "")
+                                : "—"}
+                              {v.internal_referral && (
+                                <div className="small referral-note" title={v.internal_referral.reason}>
+                                  {t("queue.referred_from", "Referred from {{from}} by Dr. {{who}}", {
+                                    from: triageLabel(v.internal_referral.from_department),
+                                    who: v.internal_referral.referred_by,
+                                  })}
+                                </div>
+                              )}
+                            </td>
+                          </>
+                        )}
                         <td className="dx-cell">
                           <DiagnosisCell v={v} />
                         </td>

@@ -27,7 +27,7 @@ def _tooth(page: Page, number: int):
 def _start_exam(rc: Page, dentist: Page, name: str):
     rc.click("text=Add to waiting list")
     rc.click("dialog[open] .form-actions button.btn-primary")
-    waiting_row(dentist, name, "doctor").get_by_role("button", name="Manage").click()
+    waiting_row(dentist, name, "doctor").get_by_role("button", name="Start examination").click()
     dentist.wait_for_url(re.compile(r"/dental/encounters/"))
     return dentist.url.split("?")[0]
 
@@ -100,9 +100,9 @@ def test_toothache_to_filling_invoice_and_follow_up(as_role, unique):
     # Diagnosis on 36.
     _tab(dr, "Diagnoses")
     dr.fill("#f-q", "dentine")
-    dr.locator("#f-term_id").select_option(index=0)
+    dr.get_by_role("radio", name=re.compile("dentine")).first.click()
     dr.locator("main #f-tooth").fill("36")
-    dr.get_by_role("button", name="Add diagnosis").click()
+    dr.get_by_role("button", name=re.compile(r"^Add K02")).click()
     expect(dr.get_by_role("tab", name=re.compile("Diagnoses 1"))).to_be_visible()
 
     # Plan: filling (accepted) and implant consultation (deferred).

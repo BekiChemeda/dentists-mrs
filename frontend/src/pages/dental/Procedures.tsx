@@ -28,6 +28,7 @@ import { ClinicHeader } from "../common";
 import { DentalStatus, PROCEDURE_TEXT_FIELDS, useClinicians, useDentalCatalog } from "./common";
 import { LocationInputs, locationBody } from "./Plans";
 import type { DentalEncounter, ProcedureRecord, ProcedureRecordBrief, TreatmentPlan } from "./types";
+import { useUnsavedGuard } from "../../lib/unsaved";
 
 export function EncounterProcedures({ encounter }: { encounter: DentalEncounter }) {
   const { t } = useTranslation();
@@ -349,6 +350,8 @@ export function ProcedureDetail({ id, onClose }: { id: string; onClose: () => vo
   // Fields typed since the last save. A newer version from the server (e.g. after saving materials) refreshes
   // only the fields the user has not touched, so unsaved typing is never thrown away.
   const dirty = useRef(new Set<string>());
+  const [hasEdits, setHasEdits] = useState(false);
+  useUnsavedGuard(`procedure-${id}`, hasEdits);
   useEffect(() => {
     if (rec.data) {
       const server = rec.data as unknown as Record<string, string>;
@@ -375,6 +378,7 @@ export function ProcedureDetail({ id, onClose }: { id: string; onClose: () => vo
       }),
     onSuccess: (r) => {
       dirty.current.clear();
+      setHasEdits(false);
       refresh(r);
       toast(t("common.saved_toast", "Changes saved"));
     },
@@ -458,6 +462,7 @@ export function ProcedureDetail({ id, onClose }: { id: string; onClose: () => vo
                   value={text[k] ?? ""}
                   onChange={(e) => {
                     dirty.current.add(k);
+                    setHasEdits(true);
                     setText((c) => ({ ...c, [k]: e.target.value }));
                   }}
                   rows={2}

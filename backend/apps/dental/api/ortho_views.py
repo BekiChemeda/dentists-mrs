@@ -126,7 +126,9 @@ class OrthoCaseDetailView(PermissionedView):
             data["version"] = expected_version(request)
             ortho.change_billing(self.ctx(), case, data)
         elif action in ("start", "retention", "complete", "discontinue"):
-            ortho.change_status(self.ctx(), case, action, reason=str(data.get("reason") or ""))
+            ortho.change_status(self.ctx(), case, action, reason=str(data.get("reason") or ""),
+                                on_date=ortho.parse_past_date(data.get("on_date"), "on_date") if action == "retention"
+                                else None)
         else:
             return Response({"error": {"code": "not_found", "message": "Unknown action."}}, status=404)
         return Response(_case_out(pk))

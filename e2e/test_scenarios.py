@@ -34,7 +34,7 @@ def test_outpatient_visit_through_every_role(as_role, unique):
     assert "OPD 1" in row.inner_text()
 
     dr = as_role("doctor")
-    waiting_row(dr, name, "doctor").get_by_role("button", name="Manage").click()
+    waiting_row(dr, name, "doctor").get_by_role("button", name="Start examination").click()
     dr.wait_for_url(re.compile(r"/consultations/"))
     expect(dr.locator("#n-complaint_duration")).to_have_value("2 days")  # carried over from triage
     dr.fill("#n-history_present_illness", "Fever with chills for two days.")

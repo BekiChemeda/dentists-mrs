@@ -48,6 +48,7 @@ import { sexAge, waitLabel } from "./common";
 import { ConsultationSummary } from "./printouts";
 import { DocumentsPanel, ReferredHere, PrescriptionDoc } from "./clinical-documents";
 import { DiagnosesPanel, LabPanel, AmendForm, PrescriptionForm, LabOrderForm } from "./consultation-orders";
+import { useUnsavedGuard } from "../lib/unsaved";
 export function ConsultationsPage() {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -208,6 +209,7 @@ export function ConsultationWorkspace() {
   const [printRx, setPrintRx] = useState<Prescription | null>(null);
   const [printSummary, setPrintSummary] = useState(false);
   const [dirty, setDirty] = useState(false);
+  useUnsavedGuard("consultation", dirty);
   const [saveError, setSaveError] = useState<unknown>(null);
   const [signError, setSignError] = useState<unknown>(null);
   const [confirmSign, setConfirmSign] = useState(false);

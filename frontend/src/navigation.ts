@@ -32,6 +32,13 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "recalls", path: "/dental/recalls", anyOf: ["dental.recall.manage"], group: "work", module: "recalls" },
   { key: "ortho", path: "/dental/ortho", anyOf: ["dental.ortho.manage"], group: "work", module: "orthodontics" },
   {
+    key: "dental_imaging",
+    path: "/dental/imaging",
+    anyOf: ["dental.imaging.upload"],
+    group: "work",
+    module: "dental_imaging",
+  },
+  {
     key: "lab_cases",
     path: "/dental/lab-cases",
     anyOf: ["dental.labcase.manage", "dental.labcase.work"],

@@ -154,6 +154,25 @@ export function useTriageDestinations(): Department[] {
 /** Prescription frequencies, as clinicians write them. Must match the server's list. */
 export const FREQUENCIES = ["Daily", "BID", "TID", "QID", "STAT", "PRN", "Nocte", "Weekly"];
 
+/** The code clinicians write, with plain words so nobody has to guess. */
+export const FREQUENCY_LABELS: Record<string, string> = {
+  Daily: "Once a day",
+  BID: "BID: twice a day",
+  TID: "TID: three times a day",
+  QID: "QID: four times a day",
+  STAT: "STAT: once, immediately",
+  PRN: "PRN: when needed",
+  Nocte: "Nocte: at night",
+  Weekly: "Once a week",
+};
+
+/** A quantity without trailing zeros: "15.000" becomes "15", "2.500" becomes "2.5". */
+export function qty(v: string | number | null | undefined): string {
+  if (v === null || v === undefined || v === "") return "";
+  const n = Number(v);
+  return Number.isFinite(n) ? String(n) : String(v);
+}
+
 /** The evaluation note in the order it is written. Signing needs the complaint, a diagnosis and the plan. */
 export const NOTE_GROUPS: { title: string; fields: string[]; hint?: Record<string, string> }[] = [
   { title: "1. Presenting complaint", fields: ["chief_complaint", "complaint_duration"] },

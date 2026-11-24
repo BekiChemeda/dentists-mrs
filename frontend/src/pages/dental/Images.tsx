@@ -2,16 +2,19 @@
  * Dental images. Files stay on the clinic server and are shown only through the API after a permission check;
  * every view is audited. The original is kept unchanged; the browser shows a JPEG preview. No DICOM support.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Upload } from "lucide-react";
 import { api } from "../../api/client";
 import { useGet } from "../../api/hooks";
 import { useAuth } from "../../auth/AuthContext";
-import { Banner, Empty, ErrorBanner, Field, Loading, Modal, Panel, ReasonDialog, toast } from "../../ui";
+import { Banner, Empty, ErrorBanner, Field, Loading, Modal, PageHead, Panel, ReasonDialog, toast } from "../../ui";
 import { formatDateTime } from "../../lib/format";
 import { useDentalCatalog } from "./common";
+import { PatientPicker } from "../common";
+import type { Patient, PatientBrief } from "../../api/types";
 import type { DentalImage } from "./types";
 
 export function ImagesPanel({ patientId, encounterId }: { patientId: string; encounterId?: string }) {
@@ -284,6 +287,41 @@ function ImageViewer({ image, onClose }: { image: DentalImage; onClose: () => vo
         error={withdraw.error}
         danger
       />
+    </div>
+  );
+}
+
+/** Imaging staff: find the patient, then take and upload images. No clinical notes are shown here. */
+export function ImagingPage() {
+  const { t } = useTranslation();
+  const [params, setParams] = useSearchParams();
+  const patientId = params.get("patient");
+  const [patient, setPatient] = useState<PatientBrief | null>(null);
+  const loaded = useGet<Patient>(["patient", patientId], patientId && !patient ? `/patients/${patientId}/` : null);
+  useEffect(() => {
+    if (loaded.data && !patient) setPatient(loaded.data as unknown as PatientBrief);
+  }, [loaded.data, patient]);
+  return (
+    <div className="stack">
+      <PageHead
+        title={t("nav.dental_imaging", "Dental imaging")}
+        sub={t("dental.imaging_sub", "Find the patient, then upload X-rays and photographs to their record.")}
+      />
+      <Panel title={t("patients.patient", "Patient")}>
+        <PatientPicker
+          value={patient}
+          onChange={(p) => {
+            setPatient(p);
+            setParams(p ? { patient: p.id } : {});
+          }}
+          autoFocus
+        />
+      </Panel>
+      {patient ? (
+        <ImagesPanel patientId={patient.id} />
+      ) : (
+        <Empty>{t("dental.imaging_pick", "Search for a patient by name, phone or record number.")}</Empty>
+      )}
     </div>
   );
 }

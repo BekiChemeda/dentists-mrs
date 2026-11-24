@@ -382,6 +382,19 @@ def update_case(ctx: ActorContext, case: OrthoCase, data: dict, expected_version
     return case
 
 
+def parse_past_date(value, field: str) -> datetime.date | None:
+    """An optional date (YYYY-MM-DD) that is not in the future."""
+    if value in (None, ""):
+        return None
+    try:
+        d = datetime.date.fromisoformat(str(value))
+    except ValueError:
+        raise BusinessValidationError("Enter a valid date.", fields={field: ["Enter a valid date."]}) from None
+    if d > timezone.localdate():
+        raise BusinessValidationError("The date cannot be in the future.", fields={field: ["Not in the future."]})
+    return d
+
+
 @transaction.atomic
 def change_status(ctx: ActorContext, case: OrthoCase, action: str, *, reason: str = "",
                   on_date: datetime.date | None = None) -> OrthoCase:
@@ -396,6 +409,9 @@ def change_status(ctx: ActorContext, case: OrthoCase, action: str, *, reason: st
     elif action == "retention":
         if case.status != C.ACTIVE:
             raise ConflictError("Only a case in active treatment can move to retention.")
+        if case.started_on and today < case.started_on:
+            raise BusinessValidationError("The braces cannot come off before treatment started.",
+                                          fields={"on_date": [f"On or after {case.started_on:%d %b %Y}."]})
         case.status, case.debonded_on = C.RETENTION, case.debonded_on or today
     elif action == "complete":
         if case.status not in (C.ACTIVE, C.RETENTION):

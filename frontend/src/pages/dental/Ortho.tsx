@@ -32,6 +32,7 @@ import {
 import { formatDateTime, formatDay } from "../../lib/format";
 import { useDentalCatalog } from "./common";
 import type { DentalImage } from "./types";
+import { useUnsavedGuard } from "../../lib/unsaved";
 
 // ---------------------------------------------------------------------------------------------------------- types
 export interface OrthoAssessment {
@@ -233,6 +234,7 @@ export function OrthoAssessmentForm({ encounterId, editable }: { encounterId: st
   const current = useGet<OrthoAssessment | null>(key, `/dental/encounters/${encounterId}/ortho-assessment/`);
   const [f, setF] = useState<Record<string, string>>({});
   const [dirty, setDirty] = useState(false);
+  useUnsavedGuard(`ortho-assessment-${encounterId}`, dirty);
   useEffect(() => {
     if (dirty || current.data === undefined) return;
     const data = current.data ?? ({} as OrthoAssessment);
@@ -410,11 +412,14 @@ function OrthoCaseDetail({ c, encounterId, patientId }: { c: OrthoCase; encounte
   const qc = useQueryClient();
   const manage = can("dental.ortho.manage");
   const ortho = useOrthoCatalog();
-  const [dialog, setDialog] = useState<null | "visit" | "billing" | "details" | "discontinue" | "complete">(null);
+  const [dialog, setDialog] = useState<
+    null | "visit" | "billing" | "details" | "discontinue" | "complete" | "retention"
+  >(null);
+  const [removedOn, setRemovedOn] = useState(today());
   const [voiding, setVoiding] = useState<OrthoVisit | null>(null);
   const act = useMutation({
-    mutationFn: ({ action, reason }: { action: string; reason?: string }) =>
-      api.post<OrthoCase>(`/dental/ortho/cases/${c.id}/${action}/`, { reason: reason ?? "" }),
+    mutationFn: ({ action, reason, on_date }: { action: string; reason?: string; on_date?: string }) =>
+      api.post<OrthoCase>(`/dental/ortho/cases/${c.id}/${action}/`, { reason: reason ?? "", on_date }),
     onSuccess: () => {
       invalidate(qc);
       setDialog(null);
@@ -459,7 +464,7 @@ function OrthoCaseDetail({ c, encounterId, patientId }: { c: OrthoCase; encounte
                   </button>
                 )}
                 {c.status === "active" && (
-                  <button className="btn btn-sm" onClick={() => act.mutate({ action: "retention" })}>
+                  <button className="btn btn-sm" onClick={() => setDialog("retention")}>
                     {t("dental.ortho_to_retention", "Move to retention")}
                   </button>
                 )}
@@ -583,8 +588,14 @@ function OrthoCaseDetail({ c, encounterId, patientId }: { c: OrthoCase; encounte
                       )}
                     </td>
                     <td className="small">
-                      {v.charge ? `${money(v.charge)}` : v.no_charge_reason ? `— (${v.no_charge_reason})` : "—"}
-                      {Number(v.extra_charge) > 0 && (
+                      {v.status === "entered_in_error"
+                        ? t("dental.not_charged_error", "Not charged (entered in error)")
+                        : v.charge
+                          ? `${money(v.charge)}`
+                          : v.no_charge_reason
+                            ? `— (${v.no_charge_reason})`
+                            : "—"}
+                      {v.status !== "entered_in_error" && Number(v.extra_charge) > 0 && (
                         <div>
                           + {money(v.extra_charge)} ({v.extra_charge_reason})
                         </div>
@@ -666,6 +677,46 @@ function OrthoCaseDetail({ c, encounterId, patientId }: { c: OrthoCase; encounte
         onClose={() => setDialog(null)}
         onConfirm={(reason) => act.mutate({ action: "complete", reason })}
       />
+      <Modal
+        open={dialog === "retention"}
+        title={t("dental.ortho_to_retention", "Move to retention")}
+        onClose={() => setDialog(null)}
+      >
+        <form
+          className="stack-sm"
+          onSubmit={(e) => {
+            e.preventDefault();
+            act.mutate({ action: "retention", on_date: removedOn });
+          }}
+        >
+          <p className="muted">
+            {t(
+              "dental.ortho_retention_hint",
+              "Use this when the braces have come off. If you are recording the removal visit now, use Record orthodontic visit and choose Braces removed instead.",
+            )}
+          </p>
+          <ErrorBanner error={act.error} />
+          <Field label={t("dental.ortho_removed_on", "Braces removed on")} id="f-removed_on">
+            <input
+              id="f-removed_on"
+              type="date"
+              value={removedOn}
+              max={today()}
+              min={c.started_on ?? undefined}
+              onChange={(e) => setRemovedOn(e.target.value)}
+              required
+            />
+          </Field>
+          <div className="form-actions">
+            <button type="button" className="btn" onClick={() => setDialog(null)}>
+              {t("common.cancel")}
+            </button>
+            <button className="btn btn-primary" disabled={act.isPending || !removedOn}>
+              {t("dental.ortho_to_retention", "Move to retention")}
+            </button>
+          </div>
+        </form>
+      </Modal>
       <ReasonDialog
         open={voiding !== null}
         title={t("dental.ortho_void_title", "Visit entered in error")}
@@ -1066,13 +1117,19 @@ function BillingForm({ c, onDone }: { c: OrthoCase; onDone: () => void }) {
   const invoiced = c.instalments
     .filter((i) => i.status === "scheduled" && i.invoice)
     .reduce((sum, i) => sum + Number(i.amount), 0);
+  // Start from the case's current schedule: the instalments not yet invoiced, at their current spacing.
+  const open = c.instalments
+    .filter((i) => i.status === "scheduled" && !i.invoice)
+    .sort((a, b) => a.due_date.localeCompare(b.due_date));
+  const gap =
+    open.length > 1 ? Math.round((Date.parse(open[1].due_date) - Date.parse(open[0].due_date)) / 86_400_000) : 30;
   const [f, setF] = useState<Record<string, string>>({
     billing_mode: c.billing_mode,
     package_price: c.package_price ?? "",
     per_visit_price: c.per_visit_price ?? "",
-    instalment_count: "6",
-    instalment_interval_days: "30",
-    first_payment_date: today(),
+    instalment_count: String(open.length || 6),
+    instalment_interval_days: String(gap > 0 ? gap : 30),
+    first_payment_date: open[0] && open[0].due_date > today() ? open[0].due_date : today(),
     reason: "",
   });
   const set = (k: string, v: string) => setF((x) => ({ ...x, [k]: v }));
@@ -1093,10 +1150,15 @@ function BillingForm({ c, onDone }: { c: OrthoCase; onDone: () => void }) {
       }}
     >
       <Banner tone="info">
-        {t(
-          "dental.ortho_billing_change_hint",
-          "What has already been invoiced stays as it is. Instalments not yet invoiced are cancelled and replaced by the new schedule.",
-        )}
+        {c.billing_mode === "package"
+          ? t(
+              "dental.ortho_billing_change_hint",
+              "What has already been invoiced stays as it is. Instalments not yet invoiced are replaced by the schedule below.",
+            )
+          : t(
+              "dental.ortho_billing_change_hint_visit",
+              "Visits already charged keep their price. The new price applies to visits recorded from now on.",
+            )}
       </Banner>
       <ErrorBanner error={save.error} />
       <Segmented

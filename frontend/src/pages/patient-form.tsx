@@ -224,8 +224,19 @@ export function PatientForm({
               {t("patients.dob_unknown", "Date of birth unknown: enter age")}
             </label>
           </div>
-          <Field label={t("patients.phone", "Phone")} id="f-phone" error={fe("phone")} hint="09… or +251…">
-            <input id="f-phone" type="tel" value={f.phone} onChange={set("phone")} />
+          <Field
+            label={t("patients.phone", "Phone")}
+            id="f-phone"
+            error={
+              fe("phone").length
+                ? fe("phone")
+                : f.phone && /[^\d\s+()-]/.test(f.phone)
+                  ? [t("patients.phone_digits", "Use digits only, e.g. 0911 234 567 or +251 911 234 567.")]
+                  : undefined
+            }
+            hint="09… or +251…"
+          >
+            <input id="f-phone" type="tel" inputMode="tel" value={f.phone} onChange={set("phone")} />
           </Field>
           <Field label={t("patients.alt_phone", "Second phone")} id="f-alt_phone" error={fe("alt_phone")}>
             <input id="f-alt_phone" type="tel" value={f.alt_phone} onChange={set("alt_phone")} />
@@ -325,6 +336,15 @@ export function PatientForm({
         </fieldset>
       )}
       <div className="form-actions">
+        {(!f.first_name || !f.sex) && (
+          <span className="small muted">
+            {t("patients.still_needed", "Still needed: {{fields}}", {
+              fields: [!f.first_name && t("patients.first_name", "First name"), !f.sex && t("patients.sex", "Sex")]
+                .filter(Boolean)
+                .join(", "),
+            })}
+          </span>
+        )}
         <button className="btn btn-primary" type="submit" disabled={busy || !f.first_name || !f.sex}>
           {busy
             ? t("common.saving")

@@ -43,3 +43,9 @@ taken. If you upload the wrong image, tell the dentist or the imaging lead: they
 
 Signing buttons, the treatment plan editor and billing. If a button you expect is missing, ask the clinic
 administrator. The system enforces the same limits on the server, so a missing button is never just hidden.
+
+## Imaging staff
+
+Imaging staff have their own page, **Dental imaging**. Search for the patient by name, phone or record number,
+then **Upload image** (X-ray, photograph, scan). Imaging staff see the images and the patient's name and record
+number, not examination notes, diagnoses or medicines.

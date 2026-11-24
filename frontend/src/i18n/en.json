@@ -35,7 +35,8 @@
     "recalls": "Recalls",
     "lab_cases": "Dental laboratory",
     "dental_catalogue": "Dental catalogue",
-    "ortho": "Orthodontics"
+    "ortho": "Orthodontics",
+    "dental_imaging": "Dental imaging"
   },
   "auth": {
     "sign_in": "Sign in",
@@ -194,7 +195,9 @@
     "send_doctor": "Send to dentist without triage",
     "kind_consult": "See a dentist",
     "lane_doctor_inline": "waiting for the dentist",
-    "lane_consult": "In the chair"
+    "lane_consult": "In the chair",
+    "sent_to": "Department",
+    "walk_in": "Add walk-in patient"
   },
   "appointments": {
     "all_doctors": "All dentists",

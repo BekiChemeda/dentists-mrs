@@ -278,3 +278,35 @@ def test_ortho_reports(dental, exam):
     assert [r["instalment"] for r in rows] == ["Deposit", "Instalment 1 of 9"]
     assert dental.dentist.get("/api/v1/reports/dental_ortho_instalments/").status_code == 403
     assert OrthoInstalment.objects.filter(case_id=case["id"]).count() == 10
+
+
+def test_manual_move_to_retention_records_the_removal_date_given(dental, exam):
+    p, v, enc = exam()
+    case = _package(dental, p, deposit="0", package_price="30000", instalment_count=2)
+    _visit(dental, case, kind="bonding")
+    url = f"{API}/ortho/cases/{case['id']}/retention/"
+    tomorrow = timezone.localdate() + datetime.timedelta(days=1)
+    assert dental.dentist.post(url, {"on_date": tomorrow.isoformat()}, format="json").status_code == 400
+    assert dental.dentist.post(url, {"on_date": "not-a-date"}, format="json").status_code == 400
+    yesterday = timezone.localdate() - datetime.timedelta(days=1)
+    # Treatment started today: the braces cannot have come off before that.
+    assert dental.dentist.post(url, {"on_date": yesterday.isoformat()}, format="json").status_code == 400
+    out = ok(dental.dentist.post(url, {"on_date": timezone.localdate().isoformat()}, format="json"))
+    assert out["status"] == "retention" and out["debonded_on"] == timezone.localdate().isoformat()
+
+
+def test_visit_timeline_hides_clinical_detail_from_non_clinical_staff(dental, exam):
+    p, v, enc = exam()
+    ok(dental.dentist.patch(f"{API}/encounters/{enc['id']}/", {"version": enc["version"],
+                                                                "chief_complaint": "Pain on 36",
+                                                                "assessment": "Caries 36"}, format="json"))
+    ok(dental.dentist.post(f"{API}/encounters/{enc['id']}/sign/"))
+    clinical = ok(dental.dentist.get(f"/api/v1/visits/{v['id']}/timeline/"))
+    for role in ("cashier", "imaging_staff", "receptionist"):
+        rows = ok(getattr(dental, role).get(f"/api/v1/visits/{v['id']}/timeline/"))
+        assert len(rows) == len(clinical)
+        for mine, full in zip(rows, clinical):
+            if full["kind"].startswith("dental."):
+                assert mine["summary"] in ("Dental examination step recorded", "Dental procedure recorded")
+            else:
+                assert mine["summary"] == full["summary"]

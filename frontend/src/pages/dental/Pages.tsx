@@ -584,7 +584,10 @@ export function LabCasesPage() {
                 "dental.lab_sub",
                 "Crowns, bridges and dentures sent to the technician. Create a case from the patient's dental record.",
               )
-            : t("dental.lab_sub_tech", "Cases assigned to you.")
+            : t(
+                "dental.lab_sub_tech",
+                "Cases assigned to you. Press Start work when you begin, and Ready for fitting when it is finished.",
+              )
         }
         actions={
           <select aria-label={t("users.status")} value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -634,6 +637,11 @@ export function LabCasesPage() {
                   </td>
                   <td className="num">
                     <div className="row">
+                      {!manage && c.status === "ready" && (
+                        <span className="small muted">
+                          {t("dental.waiting_fitting", "With the dentist for fitting. The dentist marks it delivered.")}
+                        </span>
+                      )}
                       {next(c).map((n) => (
                         <button
                           key={n.to}

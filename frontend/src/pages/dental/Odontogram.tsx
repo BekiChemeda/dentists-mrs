@@ -178,7 +178,12 @@ export function ChartLegend({ findings, types }: { findings: Finding[]; types: F
       <strong>{t("dental.legend", "Legend")}</strong>
       <ul>
         <li>
-          <span className="legend-swatch solid" /> {t("dental.legend_condition", "Filled surface: current condition")}
+          <span className="legend-swatch solid" />{" "}
+          {t("dental.legend_condition", "Coloured surface: condition recorded on that surface")}
+        </li>
+        <li>
+          <span className="sym">C</span>{" "}
+          {t("dental.legend_letters", "Letters under a tooth: what was recorded for the whole tooth")}
         </li>
         <li>
           <span className="legend-swatch hatch" /> {t("dental.legend_existing", "Hatched surface: existing treatment")}
@@ -394,6 +399,14 @@ export function ToothPanel({
                   ]
             }
           />
+          {scope === "tooth" && (
+            <p className="small muted">
+              {t(
+                "dental.fillings_on_surfaces",
+                "Fillings and caries on a surface: choose Surfaces, tick the surfaces, then pick the filling or caries.",
+              )}
+            </p>
+          )}
           {scope === "surfaces" && typeof tooth === "number" && (
             <div className="row" role="group" aria-label={t("dental.surfaces", "Surfaces")}>
               {allowedSurfaces(tooth).map((s) => (

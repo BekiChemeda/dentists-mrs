@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Banknote, FilePlus2, Printer, RotateCcw, Trash2 } from "lucide-react";
@@ -228,10 +228,17 @@ function NewInvoiceForm({ onDone }: { onDone: (inv: Invoice) => void }) {
   const stateLabel = useStateLabel();
   const [patient, setPatient] = useState<PatientBrief | null>(null);
   const [visit, setVisit] = useState("");
+  const [visitTouched, setVisitTouched] = useState(false);
   const visits = useGet<Paginated<Visit>>(
     ["visits", "patient", patient?.id],
     patient ? `/visits/?patient=${patient.id}&page_size=10` : null,
   );
+  // Most invoices are for today's visit: choose it unless the cashier picks something else.
+  useEffect(() => {
+    if (visitTouched || visit) return;
+    const today = visits.data?.results.find((v) => v.visit_date === todayIso() && v.status !== "cancelled");
+    if (today) setVisit(today.id);
+  }, [visits.data, visitTouched, visit]);
   const create = useAction(
     () => api.post<Invoice>("/billing/invoices/", { patient_id: patient?.id, visit_id: visit || null }),
     [["invoices"]],
@@ -253,6 +260,7 @@ function NewInvoiceForm({ onDone }: { onDone: (inv: Invoice) => void }) {
           onChange={(p) => {
             setPatient(p);
             setVisit("");
+            setVisitTouched(false);
           }}
           autoFocus
         />
@@ -266,8 +274,17 @@ function NewInvoiceForm({ onDone }: { onDone: (inv: Invoice) => void }) {
             "Linking a visit adds its consultation, laboratory and dispensed medicines automatically.",
           )}
         >
-          <select id="ni-v" value={visit} onChange={(e) => setVisit(e.target.value)}>
-            <option value="">{t("billing.no_visit", "No visit (counter sale or service only)")}</option>
+          <select
+            id="ni-v"
+            value={visit}
+            onChange={(e) => {
+              setVisit(e.target.value);
+              setVisitTouched(true);
+            }}
+          >
+            <option value="">
+              {t("billing.no_visit", "No visit (counter sale, or orthodontic instalments only)")}
+            </option>
             {visits.data?.results.map((v) => (
               <option key={v.id} value={v.id}>
                 {formatDay(v.visit_date)}, {t("billing.ticket", "ticket")} {v.queue_number},{" "}
@@ -640,6 +657,14 @@ export function InvoicePage() {
       </div>
 
       <Modal open={paying} title={t("billing.take_payment", "Take payment")} onClose={() => setPaying(false)}>
+        {pending.some((a) => a.kind === "discount") && (
+          <Banner tone="warn">
+            {t(
+              "billing.discount_pending_pay",
+              "A discount on this invoice is still waiting for approval, so the balance below does not include it. Ask the manager to approve it first, or take only part of the payment.",
+            )}
+          </Banner>
+        )}
         <PaymentForm
           invoice={i}
           onDone={(p) => {
