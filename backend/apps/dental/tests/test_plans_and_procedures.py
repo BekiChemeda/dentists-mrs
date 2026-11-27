@@ -385,7 +385,7 @@ def test_deferred_item_keeps_the_plan_open_until_decided(dental, exam, catalog_d
     ok(dental.dentist.post(f"/api/v1/dental/plans/{plan['id']}/decision/",
                            {"decisions": {comp["id"]: "accepted", ext["id"]: "deferred"}}, format="json"))
     rec = ok(_record(dental, enc, item=comp), 201)
-    ok(_sign(dental, rec))
+    ok(_sign(dental, rec, confirm_charge=True))  # starter catalogue price 0
     plan = ok(dental.dentist.get(f"/api/v1/dental/plans/{plan['id']}/"))
     assert plan["status"] == "in_progress"
     # The patient comes back for the extraction: it can still be accepted and carried out.
@@ -393,7 +393,7 @@ def test_deferred_item_keeps_the_plan_open_until_decided(dental, exam, catalog_d
                                   {"decisions": {ext["id"]: "accepted"}}, format="json"))
     assert {i["status"] for i in plan["items"]} == {"completed", "accepted"}
     rec = ok(_record(dental, enc, item=ext), 201)
-    ok(_sign(dental, rec))
+    ok(_sign(dental, rec, confirm_charge=True))
     plan = ok(dental.dentist.get(f"/api/v1/dental/plans/{plan['id']}/"))
     assert plan["status"] == "completed"
 
@@ -406,7 +406,7 @@ def test_declining_the_deferred_item_completes_the_plan(dental, exam, catalog_da
     ok(dental.dentist.post(f"/api/v1/dental/plans/{plan['id']}/present/"))
     ok(dental.dentist.post(f"/api/v1/dental/plans/{plan['id']}/decision/",
                            {"decisions": {comp["id"]: "accepted", ext["id"]: "deferred"}}, format="json"))
-    ok(_sign(dental, ok(_record(dental, enc, item=comp), 201)))
+    ok(_sign(dental, ok(_record(dental, enc, item=comp), 201), confirm_charge=True))
     plan = ok(dental.dentist.post(f"/api/v1/dental/plans/{plan['id']}/decision/",
                                   {"decisions": {ext["id"]: "declined"}}, format="json"))
     assert plan["status"] == "completed"

@@ -187,6 +187,13 @@ export interface ProcedureRecord extends ProcedureRecordBrief {
     created_at: string;
   }[];
   billed: { invoice_id: string; invoice_number: string; status: string } | null;
+  charge: {
+    price: string;
+    estimate: string | null;
+    expected_total: string | null;
+    billing_mode: string;
+    warning: "no_price" | "differs_from_estimate" | null;
+  } | null;
 }
 
 export interface DentalEncounter {

@@ -27,8 +27,8 @@ from apps.scheduling.services import visit_event
 from ..models import (
     DentalEncounter, DentalProcedure, ProcedureAmendment, ProcedureMaterial, ProcedureRecord, TreatmentPlanItem,
 )
-from .common import open_encounter, same_patient
-from .plans import _clean_item_location, on_procedure_signed
+from .common import check_amend_author, open_encounter, same_patient
+from .plans import _clean_item_location, lock_item, on_procedure_signed
 
 S = ProcedureRecord.Status
 
@@ -60,10 +60,9 @@ def create_record(ctx: ActorContext, encounter: DentalEncounter, data: dict) -> 
     enc = open_encounter(encounter)
     plan_item = None
     if data.get("plan_item_id"):
-        plan_item = (TreatmentPlanItem.objects.select_for_update().select_related("plan", "procedure")
-                     .filter(pk=data["plan_item_id"]).first())
-        if plan_item is None:
+        if not TreatmentPlanItem.objects.filter(pk=data["plan_item_id"]).exists():
             raise BusinessValidationError("Unknown plan item.", fields={"plan_item_id": ["Not found."]})
+        plan_item, _plan = lock_item(data["plan_item_id"])
         same_patient(plan_item.plan, enc.patient_id, "plan_item_id")
         if plan_item.status not in (TreatmentPlanItem.Status.ACCEPTED, TreatmentPlanItem.Status.IN_PROGRESS):
             raise ConflictError("Only accepted plan items are carried out. Record the patient's decision first.")
@@ -178,9 +177,58 @@ def discard_record(ctx: ActorContext, record: ProcedureRecord, reason: str) -> N
     record.delete()
 
 
+def _is_charged(procedure: DentalProcedure, outcome: str) -> bool:
+    """Whether signing with this outcome puts a charge on the visit (see billable_procedures)."""
+    return outcome == S.COMPLETED or (outcome == S.SESSION_COMPLETED
+                                      and procedure.billing_mode == DentalProcedure.BillingMode.PER_SESSION)
+
+
+def charge_check(record: ProcedureRecord) -> dict:
+    """
+    What signing this record will charge, compared with the estimate the patient accepted for the plan item.
+
+    The bill always uses the catalogue price at signing (the estimate is separate from the invoice), so a price of 0
+    or a price that differs from the accepted estimate must be confirmed by the clinician before signing.
+    """
+    procedure = record.procedure
+    price = procedure.price
+    estimate = expected = None
+    if record.plan_item_id:
+        item = record.plan_item
+        estimate = item.estimated_fee
+        sessions = item.sessions_planned if procedure.billing_mode == DentalProcedure.BillingMode.PER_SESSION else 1
+        expected = price * sessions
+    warning = None
+    if price <= 0:
+        warning = "no_price"
+    elif estimate is not None and estimate != expected:
+        warning = "differs_from_estimate"
+    return {"price": str(price), "estimate": None if estimate is None else str(estimate),
+            "expected_total": None if expected is None else str(expected), "billing_mode": procedure.billing_mode,
+            "warning": warning}
+
+
+def _require_charge_confirmed(record: ProcedureRecord, outcome: str, confirmed: bool) -> None:
+    if not _is_charged(record.procedure, outcome):
+        return
+    check = charge_check(record)
+    if check["warning"] is None or confirmed:
+        return
+    name = record.procedure.name
+    if check["warning"] == "no_price":
+        message = (f"{name} has no price in the procedure catalogue, so it would be billed at 0 ETB, and the price "
+                   f"cannot be changed after signing. Ask the clinic administrator to set the price, or confirm "
+                   f"that this procedure is free of charge.")
+    else:
+        message = (f"The patient accepted an estimate of {check['estimate']} ETB for {name}; the invoice will use "
+                   f"the catalogue price ({check['expected_total']} ETB). Confirm the charge, or ask for the "
+                   f"estimate or the catalogue price to be corrected first.")
+    raise ConflictError(message, fields={"confirm_charge": ["Confirm the charge."]}, extra={"charge": check})
+
+
 @transaction.atomic
 def sign_record(ctx: ActorContext, record: ProcedureRecord, *, outcome: str, reason: str = "",
-                create_recall: bool = True) -> ProcedureRecord:
+                create_recall: bool = True, confirm_charge: bool = False) -> ProcedureRecord:
     record = _lock_draft(record)
     if record.performed_by_id != ctx.user.pk:
         raise PermissionDeniedError("Only the clinician recorded as performing the procedure can sign it.")
@@ -188,6 +236,16 @@ def sign_record(ctx: ActorContext, record: ProcedureRecord, *, outcome: str, rea
         raise BusinessValidationError("Completed, session completed or not performed.", fields={"outcome": ["Invalid."]})
     if outcome == S.NOT_PERFORMED and not reason.strip():
         raise BusinessValidationError("Say why it was not performed.", fields={"reason": ["Required."]})
+    if record.plan_item_id:
+        # Plan first, then item (plans.lock_item), so this cannot deadlock with a decision on the same plan.
+        plan_item, _plan = lock_item(record.plan_item_id)
+        record.plan_item = plan_item
+        if outcome != S.NOT_PERFORMED and plan_item.status not in (TreatmentPlanItem.Status.ACCEPTED,
+                                                                   TreatmentPlanItem.Status.IN_PROGRESS):
+            raise ConflictError(f"The plan item for {record.procedure.name} is "
+                                f"{plan_item.get_status_display().lower()}, so it cannot be recorded as done. "
+                                f"Record the patient's decision on the plan first, or sign it as not performed.")
+    _require_charge_confirmed(record, outcome, confirm_charge)
     now = timezone.now()
     record.status, record.signed_at, record.signed_by = outcome, now, ctx.user
     record.completed_at = now if outcome != S.NOT_PERFORMED else None
@@ -205,7 +263,8 @@ def sign_record(ctx: ActorContext, record: ProcedureRecord, *, outcome: str, rea
     record.version += 1
     record.save()
     record_event(ctx, action="dental_procedure.sign", object_type="dental_procedure", object_id=record.pk,
-                 details={"number": record.number, "outcome": outcome, "price": str(record.price or "")})
+                 details={"number": record.number, "outcome": outcome, "price": str(record.price or ""),
+                          **({"charge_confirmed": charge_check(record)["warning"]} if confirm_charge else {})})
     visit_event(ctx, record.visit_id, "dental.procedure",
                 f"{record.procedure.name} ({record.location_label}): {record.get_status_display().lower()}")
     if record.plan_item_id:
@@ -223,9 +282,10 @@ def sign_record(ctx: ActorContext, record: ProcedureRecord, *, outcome: str, rea
 @transaction.atomic
 def amend_record(ctx: ActorContext, record: ProcedureRecord, *, field_name: str, text: str,
                  reason: str) -> ProcedureAmendment:
-    record = ProcedureRecord.objects.select_for_update().get(pk=record.pk)
+    record = ProcedureRecord.objects.select_for_update(of=("self",)).select_related("signed_by").get(pk=record.pk)
     if record.status == S.DRAFT:
         raise ConflictError("A draft is edited directly.")
+    check_amend_author(ctx, record.signed_by, "procedure record")
     if field_name not in ProcedureRecord.TEXT_FIELDS:
         raise BusinessValidationError("Unknown section.", fields={"field_name": ["Unknown section."]})
     if not reason.strip() or not text.strip():

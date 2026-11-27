@@ -157,6 +157,19 @@ def _visit_service(visit):
     return ServicePrice.objects.filter(code=CONSULTATION_CODE, is_active=True).first()
 
 
+def _billed_sources(charges: list[dict]) -> set[tuple[str, str]]:
+    """The (source_type, source_id) pairs among these charges that are already on a live invoice line."""
+    wanted: dict[str, list[str]] = {}
+    for c in charges:
+        wanted.setdefault(c["source_type"], []).append(c["source_id"])
+    billed: set[tuple[str, str]] = set()
+    for source_type, ids in wanted.items():
+        # Same predicate as the partial unique index invoice_line_source_once, so the index is used.
+        billed.update(InvoiceLine.objects.filter(is_void=False, source_type=source_type, source_id__in=ids)
+                      .exclude(source_type="").values_list("source_type", "source_id"))
+    return billed
+
+
 def unbilled_charges(visit) -> list[dict]:
     """
     Charges for a visit that are billable under the clinic's policy and not yet on a live invoice.
@@ -167,40 +180,35 @@ def unbilled_charges(visit) -> list[dict]:
     """
     from apps.core.models import ClinicSettings
 
-    billed = set(InvoiceLine.objects.filter(is_void=False).exclude(source_type="")
-                 .values_list("source_type", "source_id"))
     charges: list[dict] = []
     consult = _visit_service(visit)
     settings_row = ClinicSettings.get()
     # Dental visits are charged by procedure; the consultation fee only if the clinic chose to add one.
     consulted = visit.encounters.exists() or (settings_row.bill_consultation_for_dental
                                               and visit.dental_encounters.exists())
-    if consult and ("visit", str(visit.pk)) not in billed and consulted:
+    if consult and consulted:
         charges.append({"kind": InvoiceLine.Kind.CONSULTATION, "description": consult.name, "quantity": Decimal(1),
                         "unit_price": consult.price, "source_type": "visit", "source_id": str(visit.pk),
                         "tax_rate": consult.tax_rate})
     point = settings_row.lab_billing_point
     for item in (LabOrderItem.objects.select_related("test")
                  .filter(order__visit_id=visit.pk, status__in=LAB_BILLABLE[point], is_chargeable=True)):
-        if ("lab_item", str(item.pk)) not in billed:
-            charges.append({"kind": InvoiceLine.Kind.LAB, "description": f"Lab: {item.test.name}",
-                            "quantity": Decimal(1), "unit_price": item.price, "source_type": "lab_item",
-                            "source_id": str(item.pk)})
+        charges.append({"kind": InvoiceLine.Kind.LAB, "description": f"Lab: {item.test.name}",
+                        "quantity": Decimal(1), "unit_price": item.price, "source_type": "lab_item",
+                        "source_id": str(item.pk)})
     for d in (Dispensation.objects.select_related("item")
               .filter(prescription_item__prescription__visit_id=visit.pk)):
-        if ("dispensation", str(d.pk)) not in billed:
-            charges.append({"kind": InvoiceLine.Kind.MEDICATION, "description": str(d.item), "quantity": d.quantity,
-                            "unit_price": d.unit_price, "source_type": "dispensation", "source_id": str(d.pk),
-                            "tax_rate": d.item.tax_rate})
+        charges.append({"kind": InvoiceLine.Kind.MEDICATION, "description": str(d.item), "quantity": d.quantity,
+                        "unit_price": d.unit_price, "source_type": "dispensation", "source_id": str(d.pk),
+                        "tax_rate": d.item.tax_rate})
     from apps.dental.services.procedures import billable_procedures
 
     for rec in billable_procedures(visit):
-        if ("dental_procedure", str(rec.pk)) not in billed:
-            session = f" (session {rec.session_number})" if rec.status == "session_completed" else ""
-            where = f" — {rec.location_label}" if rec.scope != "mouth" else ""
-            charges.append({"kind": InvoiceLine.Kind.PROCEDURE, "description": f"{rec.procedure.name}{where}{session}"[:200],
-                            "quantity": Decimal(1), "unit_price": rec.price, "source_type": "dental_procedure",
-                            "source_id": str(rec.pk), "tax_rate": rec.tax_rate})
+        session = f" (session {rec.session_number})" if rec.status == "session_completed" else ""
+        where = f" — {rec.location_label}" if rec.scope != "mouth" else ""
+        charges.append({"kind": InvoiceLine.Kind.PROCEDURE, "description": f"{rec.procedure.name}{where}{session}"[:200],
+                        "quantity": Decimal(1), "unit_price": rec.price, "source_type": "dental_procedure",
+                        "source_id": str(rec.pk), "tax_rate": rec.tax_rate})
     from apps.core.modules import is_enabled
 
     if is_enabled("orthodontics"):
@@ -208,10 +216,10 @@ def unbilled_charges(visit) -> list[dict]:
 
         # Orthodontic visit charges (per-visit cases, extra charges) and the patient's package instalments
         # that have fallen due by the visit date.
-        for charge in visit_charges(visit) + due_instalment_charges(visit.patient_id, visit.visit_date):
-            if (charge["source_type"], charge["source_id"]) not in billed:
-                charges.append(charge)
-    return charges
+        charges += visit_charges(visit) + due_instalment_charges(visit.patient_id, visit.visit_date)
+    # Only these charges' own sources are looked up: never the whole invoice-line table.
+    billed = _billed_sources(charges)
+    return [c for c in charges if (c["source_type"], c["source_id"]) not in billed]
 
 
 def unbilled_patient_charges(patient_id) -> list[dict]:
@@ -319,7 +327,10 @@ def record_payment(ctx: ActorContext, invoice: Invoice, *, amount, method: str, 
     return payment
 
 
+@transaction.atomic
 def request_discount(ctx: ActorContext, invoice: Invoice, *, amount, reason: str) -> ApprovalRequest:
+    # Locked, so two requests made at the same moment are checked one after the other.
+    invoice = _lock(invoice)
     amount = money(amount)
     if invoice.status not in OPEN_STATUSES:
         raise ConflictError("Discounts can only be requested on open invoices. For a paid invoice, request a refund "
@@ -327,7 +338,15 @@ def request_discount(ctx: ActorContext, invoice: Invoice, *, amount, reason: str
     if amount <= 0 or amount > invoice.subtotal:
         raise BusinessValidationError("Discount must be between 0 and the invoice subtotal.",
                                       fields={"amount": ["Out of range."]})
-    if problem := discount_problem(invoice, amount):
+    # Discounts already waiting count too: together they must still fit the invoice, or payment would be blocked.
+    waiting = outstanding_discounts(invoice)
+    if waiting and invoice.discount_amount + waiting + amount > invoice.subtotal:
+        room = max(invoice.subtotal - invoice.discount_amount - waiting, Decimal("0"))
+        raise ConflictError(f"A discount of {waiting} ETB is already waiting for approval on {invoice.number}. "
+                            f"With this request the discounts would be more than the charges; at most {room} ETB "
+                            f"more can be requested. Wait for the first request to be decided.",
+                            fields={"amount": [f"At most {room}."]})
+    if problem := discount_problem(invoice, waiting + amount):
         raise ConflictError(problem, fields={"amount": ["Too large for what is still unpaid."]})
     return approvals.request_approval(ctx, kind=ApprovalRequest.Kind.DISCOUNT, object_type="invoice",
                                       object_id=invoice.pk, amount=amount, reason=reason,

@@ -155,7 +155,10 @@ def test_image_upload_view_audit_and_withdraw(dental, patient, settings):
                                         format="json").status_code == 403
     ok(dental.imaging_staff.post(f"/api/v1/dental/images/{img['id']}/withdraw/", {"reason": "Wrong patient"},
                                  format="json"))
-    assert dental.dentist.get(f"/api/v1/dental/images/{img['id']}/file/").status_code == 404
+    # Withdrawn: hidden from those who only view images; whoever manages images can still open it, audited.
+    assert dental.dental_hygienist.get(f"/api/v1/dental/images/{img['id']}/file/").status_code == 404
+    assert dental.dentist.get(f"/api/v1/dental/images/{img['id']}/file/").status_code == 200
+    assert AuditEvent.objects.filter(action="dental_image.view", details__withdrawn=True).count() == 1
     assert stored.exists()  # never deleted
     assert not ok(dental.dentist.get(url))
     assert ok(dental.dentist.get(url + "?include_withdrawn=1"))[0]["status"] == "withdrawn"
@@ -291,7 +294,8 @@ def test_dental_reports_run_and_respect_permissions(dental, exam, catalog_data):
         "procedure_id": procedure(catalog_data, "OS-EXT")["id"], "scope": "tooth", "tooth": 38}, format="json"), 201)
     rec = ok(dental.dentist.post(f"/api/v1/dental/encounters/{enc['id']}/procedures/", {
         "procedure_id": procedure(catalog_data, "PR-SCL")["id"]}, format="json"), 201)
-    ok(dental.dentist.post(f"/api/v1/dental/procedure-records/{rec['id']}/sign/", {"outcome": "completed"},
+    ok(dental.dentist.post(f"/api/v1/dental/procedure-records/{rec['id']}/sign/", {"outcome": "completed",
+                                                                                    "confirm_charge": True},
                            format="json"))
     keys = {r["key"] for r in ok(dental.clinic_admin.get("/api/v1/reports/"))}
     assert {"dental_plans", "dental_procedures", "dental_follow_ups", "dental_revenue_procedure",

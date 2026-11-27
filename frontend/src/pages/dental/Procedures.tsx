@@ -349,6 +349,7 @@ export function ProcedureDetail({ id, onClose }: { id: string; onClose: () => vo
   const [text, setText] = useState<Record<string, string>>({});
   const [outcome, setOutcome] = useState<"completed" | "session_completed" | "not_performed">("completed");
   const [reason, setReason] = useState("");
+  const [confirmCharge, setConfirmCharge] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [amending, setAmending] = useState<string | null>(null);
   const [amendText, setAmendText] = useState("");
@@ -391,7 +392,11 @@ export function ProcedureDetail({ id, onClose }: { id: string; onClose: () => vo
   const sign = useMutation({
     mutationFn: async () => {
       await save.mutateAsync();
-      return api.post<ProcedureRecord>(`/dental/procedure-records/${id}/sign/`, { outcome, reason });
+      return api.post<ProcedureRecord>(`/dental/procedure-records/${id}/sign/`, {
+        outcome,
+        reason,
+        confirm_charge: confirmCharge,
+      });
     },
     onSuccess: (r) => {
       refresh(r);
@@ -422,6 +427,9 @@ export function ProcedureDetail({ id, onClose }: { id: string; onClose: () => vo
   const draft = r.status === "draft";
   const editable = draft && can("dental.procedure.record");
   const canSign = draft && can("dental.procedure.sign") && r.performed_by.id === user?.id;
+  // Signing this outcome charges the patient (a per-session procedure charges every session).
+  const charged = outcome === "completed" || (outcome === "session_completed" && r.charge?.billing_mode === "per_session");
+  const needsConfirm = charged && !!r.charge?.warning;
   const printId = `proc-print-${r.id}`;
   return (
     <div className="stack-sm">
@@ -539,6 +547,43 @@ export function ProcedureDetail({ id, onClose }: { id: string; onClose: () => vo
               </label>
             ))}
           </div>
+          {charged && r.charge && (
+            <div className="stack-sm">
+              <div className="small">
+                {t("dental.charge_line", "Charge on signing: {{price}} ETB (catalogue price)", {
+                  price: money(r.charge.price),
+                })}
+                {r.charge.estimate != null &&
+                  ` · ${t("dental.accepted_estimate", "Accepted estimate: {{estimate}} ETB", {
+                    estimate: money(r.charge.estimate),
+                  })}`}
+              </div>
+              {r.charge.warning && (
+                <Banner tone="warn">
+                  {r.charge.warning === "no_price"
+                    ? t(
+                        "dental.charge_no_price",
+                        "This procedure has no price in the catalogue, so it will be billed at 0 ETB and cannot be corrected after signing. Ask the clinic administrator to set the price, or confirm that it is free of charge.",
+                      )
+                    : t(
+                        "dental.charge_differs",
+                        "The invoice will use the catalogue price ({{total}} ETB), not the estimate the patient accepted ({{estimate}} ETB).",
+                        { total: money(r.charge.expected_total ?? r.charge.price), estimate: money(r.charge.estimate ?? "0") },
+                      )}
+                </Banner>
+              )}
+              {needsConfirm && (
+                <label className="check">
+                  <input type="checkbox" checked={confirmCharge} onChange={(e) => setConfirmCharge(e.target.checked)} />{" "}
+                  {r.charge.warning === "no_price"
+                    ? t("dental.confirm_free", "I confirm this procedure is free of charge")
+                    : t("dental.confirm_price", "I confirm the charge of {{total}} ETB", {
+                        total: money(r.charge.expected_total ?? r.charge.price),
+                      })}
+                </label>
+              )}
+            </div>
+          )}
           {outcome === "not_performed" && (
             <Field label={t("dental.reason", "Reason")} id="f-reason" error={sign.error}>
               <input id="f-reason" value={reason} onChange={(e) => setReason(e.target.value)} required />
@@ -548,7 +593,12 @@ export function ProcedureDetail({ id, onClose }: { id: string; onClose: () => vo
             <button
               type="button"
               className="btn btn-primary"
-              disabled={sign.isPending || materialsSaving || (outcome === "not_performed" && !reason.trim())}
+              disabled={
+                sign.isPending ||
+                materialsSaving ||
+                (outcome === "not_performed" && !reason.trim()) ||
+                (needsConfirm && !confirmCharge)
+              }
               onClick={() => sign.mutate()}
             >
               {t("dental.sign", "Sign")}

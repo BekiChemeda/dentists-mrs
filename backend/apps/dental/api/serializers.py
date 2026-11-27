@@ -455,12 +455,21 @@ class ProcedureRecordSerializer(ProcedureRecordListSerializer):
     materials = serializers.SerializerMethodField()
     amendments = ProcedureAmendmentSerializer(many=True, read_only=True)
     billed = serializers.SerializerMethodField()
+    charge = serializers.SerializerMethodField()
 
     class Meta(ProcedureRecordListSerializer.Meta):
         fields = ProcedureRecordListSerializer.Meta.fields + [
             "assisted_by", "started_at", "completed_at", *ProcedureRecord.TEXT_FIELDS, "follow_up_days",
             "not_performed_reason", "signed_by", "tax_rate", "version", "created_by", "materials", "amendments",
-            "billed"]
+            "billed", "charge"]
+
+    def get_charge(self, obj):
+        """For a draft: what signing will charge and whether it needs confirming (price 0, or not the estimate)."""
+        if obj.status != ProcedureRecord.Status.DRAFT:
+            return None
+        from ..services.procedures import charge_check
+
+        return charge_check(obj)
 
     def get_materials(self, obj):
         return [{"id": str(m.pk), "item_id": str(m.item_id), "item": str(m.item), "unit": m.item.unit,
@@ -504,6 +513,8 @@ class SignProcedureInput(serializers.Serializer):
     outcome = serializers.ChoiceField(choices=[c for c in ProcedureRecord.Status.choices if c[0] != "draft"])
     reason = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")
     create_recall = serializers.BooleanField(default=True)
+    # Required when the catalogue price is 0 or differs from the patient's accepted estimate (charge_check).
+    confirm_charge = serializers.BooleanField(default=False)
 
 
 class ProcedureAmendInput(serializers.Serializer):
