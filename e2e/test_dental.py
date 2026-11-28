@@ -343,3 +343,22 @@ def test_orthodontic_case_charged_per_visit(as_role, unique):
     expect(lines).to_contain_text("Adjustment")
     expect(lines).not_to_contain_text("Braces or appliance fitted")
     _no_js_errors(rc, dr, cashier)
+
+
+def test_allergy_is_flagged_while_prescribing(as_role, unique):
+    """QA run 5: the penicillin allergy shows as soon as amoxicillin is chosen, and a refused save says so."""
+    name = f"Kalkidan E2E Allergy{unique}"
+    rc = as_role("reception")
+    register_patient(rc, "Kalkidan", f"Allergy{unique}", allergy="Penicillin")
+    dr = as_role("dentist")
+    _start_exam(rc, dr, name)
+    _tab(dr, "Prescriptions")
+    dr.fill("#f-drug-0", "Amox")
+    dr.locator("button", has_text="Amoxicillin").first.click()
+    expect(dr.locator(".banner", has_text="Recorded allergy: Penicillin")).to_be_visible()
+    expect(dr.locator("#f-ovr-0")).to_be_visible()
+    dr.fill("#f-dose-0", "500 mg")
+    dr.fill("#f-qty-0", "15")
+    dr.get_by_role("button", name="Save prescription").click()
+    expect(dr.locator(".toast", has_text="Not saved: a medicine matches a recorded allergy")).to_be_visible()
+    _no_js_errors(rc, dr)

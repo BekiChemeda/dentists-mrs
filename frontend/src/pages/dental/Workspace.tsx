@@ -8,7 +8,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Printer } from "lucide-react";
-import { api, queryString } from "../../api/client";
+import { ApiError, api, queryString } from "../../api/client";
 import { useGet } from "../../api/hooks";
 import type { Paginated, StockItem } from "../../api/types";
 import { useAuth } from "../../auth/AuthContext";
@@ -125,7 +125,13 @@ export function DentalWorkspace() {
       {tab === "diagnoses" && <DiagnosesTab encounter={e} writable={writable} />}
       {tab === "plan" && <PlanList patientId={e.patient.id} encounterId={e.id} diagnoses={e.diagnoses} />}
       {tab === "procedures" && <EncounterProcedures encounter={e} />}
-      {tab === "rx" && <PrescriptionsTab encounter={e} writable={writable && can("prescriptions.create")} />}
+      {tab === "rx" && (
+        <PrescriptionsTab
+          encounter={e}
+          writable={writable && can("prescriptions.create")}
+          allergies={summary.data?.shared_history.allergies ?? []}
+        />
+      )}
       {tab === "images" && <ImagesPanel patientId={e.patient.id} encounterId={e.id} />}
       {tab === "ortho" && (
         <div className="stack">
@@ -867,10 +873,39 @@ function isBlankLine(l: RxLine): boolean {
   return !l.item_id && ![l.drug_name, l.dose, l.duration_days, l.quantity, l.instructions].some((v) => v.trim());
 }
 
-function PrescriptionsTab({ encounter, writable }: { encounter: DentalEncounter; writable: boolean }) {
+type Allergy = DentalSummary["shared_history"]["allergies"][number];
+
+/** Recorded allergies matching a medicine: the same rule as the server (name, generic name, allergy group). */
+function allergyMatches(allergies: Allergy[], drugName: string, item?: StockItem): string[] {
+  const words = new Set([drugName.toLowerCase()]);
+  if (item) {
+    words.add(item.name.toLowerCase());
+    words.add(item.generic_name.toLowerCase());
+    for (const g of item.allergy_groups.split(",")) if (g.trim()) words.add(g.trim().toLowerCase());
+  }
+  words.delete("");
+  return allergies
+    .filter((a) => {
+      const sub = a.substance.trim().toLowerCase();
+      return sub && [...words].some((w) => w.includes(sub) || sub.includes(w));
+    })
+    .map((a) => `${a.substance} (${a.severity})`);
+}
+
+function PrescriptionsTab({
+  encounter,
+  writable,
+  allergies = [],
+}: {
+  encounter: DentalEncounter;
+  writable: boolean;
+  allergies?: Allergy[];
+}) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [lines, setLines] = useState<RxLine[]>([{ ...EMPTY_LINE }]);
+  // The catalogue entry picked for each line, so its generic name and allergy groups can be checked at once.
+  const [picked, setPicked] = useState<Record<string, StockItem>>({});
   const [search, setSearch] = useState("");
   const [focus, setFocus] = useState(0);
   const meds = useGet<Paginated<StockItem>>(
@@ -881,6 +916,14 @@ function PrescriptionsTab({ encounter, writable }: { encounter: DentalEncounter;
   );
   // A row left empty (e.g. "Add a medicine" clicked once too often) is not sent.
   const filled = lines.filter((l) => !isBlankLine(l));
+  const sentIndex = (i: number) =>
+    isBlankLine(lines[i]) ? -1 : lines.slice(0, i).filter((l) => !isBlankLine(l)).length;
+  const warnings = lines.map((l) =>
+    l.drug_name.trim().length >= 3 || l.item_id
+      ? allergyMatches(allergies, l.drug_name.trim(), l.item_id ? picked[l.item_id] : undefined)
+      : [],
+  );
+
   const send = useMutation({
     mutationFn: () =>
       api.post(`/dental/encounters/${encounter.id}/prescriptions/`, {
@@ -892,9 +935,19 @@ function PrescriptionsTab({ encounter, writable }: { encounter: DentalEncounter;
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["dental", "encounter", encounter.id] });
       setLines([{ ...EMPTY_LINE }]);
+      setPicked({});
       toast(t("dental.rx_saved", "Prescription saved"));
     },
+    onError: (error) => {
+      if (error instanceof ApiError && error.code === "allergy_warning")
+        toast(t("dental.rx_allergy_toast", "Not saved: a medicine matches a recorded allergy"), "error");
+    },
   });
+  // The server's allergy refusal names the lines it was about, numbered among the lines sent.
+  const serverConflicts =
+    send.error instanceof ApiError && send.error.code === "allergy_warning"
+      ? ((send.error.details.conflicts ?? {}) as Record<string, string[]>)
+      : {};
   const set = (i: number, patch: Partial<RxLine>) =>
     setLines((c) => c.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   const printId = `rx-print-${encounter.id}`;
@@ -989,6 +1042,7 @@ function PrescriptionsTab({ encounter, writable }: { encounter: DentalEncounter;
                       className="btn btn-sm"
                       onClick={() => {
                         set(i, { item_id: m.id, drug_name: `${m.name} ${m.strength}`.trim() });
+                        setPicked((c) => ({ ...c, [m.id]: m }));
                         setSearch("");
                       }}
                     >
@@ -1032,7 +1086,20 @@ function PrescriptionsTab({ encounter, writable }: { encounter: DentalEncounter;
                   onChange={(e) => set(i, { instructions: e.target.value })}
                 />
               </Field>
-              {send.error instanceof Error && "details" in send.error && (
+              {warnings[i].length > 0 && (
+                <div className="span-all" style={{ gridColumn: "1 / -1" }}>
+                  <Banner tone="warn">
+                    {t(
+                      "dental.rx_allergy_now",
+                      "Recorded allergy: {{a}}. Choose another medicine, or give a reason below.",
+                      {
+                        a: warnings[i].join(", "),
+                      },
+                    )}
+                  </Banner>
+                </div>
+              )}
+              {(warnings[i].length > 0 || (serverConflicts[String(sentIndex(i))] ?? []).length > 0) && (
                 <Field
                   label={t("dental.allergy_override", "Reason to continue despite the allergy (if warned)")}
                   id={`f-ovr-${i}`}

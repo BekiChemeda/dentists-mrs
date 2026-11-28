@@ -1,21 +1,43 @@
 import i18n from "../i18n";
 import { toast } from "../ui";
+import { useRef } from "react";
 import { useMutation, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { api } from "./client";
 
-/** GET with caching. Pass `null` as path to disable (e.g. until an ID is known). */
+/** Saved data younger than this is shown at once while it is refreshed; older data waits for the refresh. */
+export const RECENT_MS = 10_000;
+
+/**
+ * GET with caching. Pass `null` as path to disable (e.g. until an ID is known).
+ *
+ * When a page opens, data kept from an earlier visit is shown only if it is recent and nothing has changed it
+ * since (no save marked it out of date). Otherwise the page shows "Loading" until the fresh answer arrives, so
+ * staff never see a paid invoice under "Open invoices" or a patient already sent home in the queue. Refreshes
+ * while the page is open (polling, after a save) keep showing the current data, so typing is never interrupted.
+ */
 export function useGet<T>(
   key: QueryKey,
   path: string | null,
   options: { refetchInterval?: number; staleTime?: number } = {},
 ) {
-  return useQuery({
+  const client = useQueryClient();
+  const hash = JSON.stringify(key);
+  const opened = useRef<{ hash: string; at: number } | null>(null);
+  if (opened.current?.hash !== hash) opened.current = { hash, at: Date.now() };
+  const q = useQuery({
     queryKey: key,
     queryFn: () => api.get<T>(path as string),
     enabled: path !== null,
     refetchInterval: options.refetchInterval,
     staleTime: options.staleTime,
   });
+  const fromBefore = q.data !== undefined && q.dataUpdatedAt < opened.current.at;
+  const outdated =
+    fromBefore &&
+    q.isFetching &&
+    (client.getQueryState(key)?.isInvalidated === true || opened.current.at - q.dataUpdatedAt > RECENT_MS);
+  if (!outdated) return q;
+  return { ...q, data: undefined, isLoading: true, isPending: true, isSuccess: false, status: "pending" } as typeof q;
 }
 
 /** A write that refreshes the listed query key prefixes when it succeeds, before reporting success. */
