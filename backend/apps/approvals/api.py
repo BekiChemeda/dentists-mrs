@@ -22,7 +22,14 @@ class ApprovalSerializer(serializers.ModelSerializer):
         model = ApprovalRequest
         fields = ["id", "kind", "kind_label", "status", "object_type", "object_id", "summary", "amount", "quantity",
                   "reason", "requested_by", "decided_by", "decided_at", "decision_note", "used_at", "created_at",
-                  "can_decide", "problem"]
+                  "can_decide", "self_approval", "self_approved", "problem"]
+
+    self_approval = serializers.SerializerMethodField()
+
+    def get_self_approval(self, obj) -> bool:
+        """Deciding this one is a one-person-clinic self-approval: the page asks for a reason."""
+        user = self.context["request"].user
+        return obj.status == ApprovalRequest.Status.PENDING and services.may_self_approve(obj, user)
 
     def get_problem(self, obj) -> str | None:
         """For open requests: why approving or applying it would now fail (e.g. the invoice was paid)."""
@@ -32,7 +39,8 @@ class ApprovalSerializer(serializers.ModelSerializer):
 
     def get_can_decide(self, obj) -> bool:
         user = self.context["request"].user
-        return (obj.status == ApprovalRequest.Status.PENDING and obj.requested_by_id != user.pk
+        return (obj.status == ApprovalRequest.Status.PENDING
+                and (obj.requested_by_id != user.pk or services.may_self_approve(obj, user))
                 and user.has_permissions([ApprovalRequest.PERMISSION_FOR_KIND[obj.kind]]))
 
 

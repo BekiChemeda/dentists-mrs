@@ -52,7 +52,8 @@ On the invoice click **Take payment**.
 ## 3. Discounts, voids and refunds (two-person rule)
 
 You request; another person with approval rights (by default the clinic administrator or director)
-approves. Nobody can approve their own request, and each approval can be used once.
+approves. Nobody can approve their own request, and each approval can be used once. The one exception is a
+clinic run by one person: see *One-person clinic* in [clinic-administrator.md](clinic-administrator.md).
 
 - **Discount**: **Request discount**, amount and reason, **Send for approval**. Once approved,
   **Apply discount** on the invoice.

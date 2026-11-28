@@ -46,6 +46,8 @@ class ApprovalRequest(TimestampedModel):
                                    related_name="+")
     decided_at = models.DateTimeField(null=True, blank=True)
     decision_note = models.CharField(max_length=255, blank=True)
+    # One-person clinic: decided by the person who asked, because nobody else could (with a written reason).
+    self_approved = models.BooleanField(default=False)
     used_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
@@ -54,6 +56,7 @@ class ApprovalRequest(TimestampedModel):
         indexes = [models.Index(fields=["status", "kind"], name="approval_status_idx"),
                    models.Index(fields=["object_type", "object_id"], name="approval_object_idx")]
         constraints = [
-            models.CheckConstraint(condition=Q(decided_by__isnull=True) | ~Q(decided_by=models.F("requested_by")),
-                                   name="approval_not_self_decided"),
+            # Deciding one's own request is refused unless the row says it was a one-person-clinic self-approval.
+            models.CheckConstraint(condition=Q(decided_by__isnull=True) | ~Q(decided_by=models.F("requested_by"))
+                                   | Q(self_approved=True), name="approval_not_self_decided"),
         ]

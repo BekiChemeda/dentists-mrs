@@ -90,6 +90,10 @@ class ClinicSettings(Versioned, models.Model):
     bill_consultation_for_dental = models.BooleanField(default=False)
     # The first-run checklist on the clinic administrator's dashboard, until they close it.
     setup_checklist_hidden = models.BooleanField(default=False)
+    # One person runs the clinic (e.g. the dentist-owner also does reception and cash). Then they may approve
+    # their own refunds, discounts and voids, with a written reason, but only while no other active account
+    # could approve them (apps/approvals/services.py).
+    solo_approvals = models.BooleanField(default=False)
     # Clinic logo, shown on screens and printed documents. Kept in the database (not on disk) so the
     # normal database backup carries it. Always stored as a PNG the server re-encoded itself
     # (apps/core/branding.py), never the uploaded bytes.

@@ -804,6 +804,10 @@ export interface Approval {
   decision_note: string;
   created_at: string;
   can_decide: boolean;
+  /** Deciding it means approving one's own request (one-person clinic): a reason is required. */
+  self_approval?: boolean;
+  /** Decided by the person who asked (one-person clinic). */
+  self_approved?: boolean;
   /** Why approving or applying this request would now fail (e.g. the invoice is already paid). */
   problem?: string | null;
 }
@@ -984,6 +988,7 @@ export interface ClinicSettings {
   wait_alert_minutes?: number;
   /** Reception may send a patient straight to the doctor without triage. */
   allow_skip_triage?: boolean;
+  solo_approvals?: boolean;
   /** Close a finished visit this many minutes after signing; 0 = staff close visits. */
   auto_complete_minutes?: number;
   /** Opening hours by weekday ("mon".."sun"); null = closed that day; empty object = no limit. */

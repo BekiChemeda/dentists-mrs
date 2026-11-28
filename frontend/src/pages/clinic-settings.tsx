@@ -205,6 +205,23 @@ export function ClinicSettingsPage() {
               />{" "}
               {t("clinic.allow_skip", "Reception may send a patient straight to the doctor without triage")}
             </label>
+            <label className="check" style={{ marginTop: 12 }}>
+              <input
+                type="checkbox"
+                checked={v.solo_approvals ?? false}
+                onChange={(e) => set("solo_approvals", e.target.checked)}
+              />{" "}
+              {t(
+                "clinic.solo_approvals",
+                "One person runs the clinic: they may approve their own refunds, discounts and voids, with a written reason",
+              )}
+            </label>
+            <p className="small muted">
+              {t(
+                "clinic.solo_approvals_hint",
+                "Only works while no other active account can approve. As soon as someone else can, a second person is needed again.",
+              )}
+            </p>
           </Panel>
           <Panel title={t("clinic.doc_notes", "Document notes")}>
             <p className="small muted">
