@@ -213,7 +213,7 @@ MRS_VENDOR_PUBLIC_KEYS = env_list("MRS_VENDOR_PUBLIC_KEYS")
 MOBILE_ACTIVATION_REQUIRED = env_bool("MOBILE_ACTIVATION_REQUIRED", True)
 # Phones must prove their key is in security hardware. Turn off only on development servers (emulators).
 MOBILE_REQUIRE_HARDWARE_KEY = env_bool("MOBILE_REQUIRE_HARDWARE_KEY", True)
-MOBILE_APP_PACKAGE = env("MOBILE_APP_PACKAGE", "et.clinicmrs.clinic_mrs")
+MOBILE_APP_PACKAGE = env("MOBILE_APP_PACKAGE", "et.dentalmrs.dental_mrs")
 # SHA-256 of the supplier's app signing certificate(s); when set, re-signed copies of the app are refused.
 MOBILE_APP_SIGNATURE_SHA256 = env_list("MOBILE_APP_SIGNATURE_SHA256")
 # Payments by phone (apps/payments): requests to Chapa/telebirr go through the egress relay container.

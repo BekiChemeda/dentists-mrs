@@ -34,6 +34,9 @@ code; the app also checks the supplier's signature, which raises the effort abov
    - in each clinic server's `.env` as `MRS_VENDOR_PUBLIC_KEYS=`.
 3. Optional, stronger: put the SHA-256 of the app's release signing certificate (printed in the app build
    log) in each server's `.env` as `MOBILE_APP_SIGNATURE_SHA256=`.
+4. The app is built from the repository `BekiChemeda/dentists-mrs-mobile`. Its Android id is
+   `et.dentalmrs.dental_mrs`, which the server expects by default (`MOBILE_APP_PACKAGE`). The Clinic MRS app
+   (`et.clinicmrs.clinic_mrs`) cannot activate against a Dental MRS server.
 
 ## Supplier: per clinic
 
@@ -56,7 +59,7 @@ code; the app also checks the supplier's signature, which raises the effort abov
 
 1. **Administration › Phones › Activate a phone.** Optionally choose the staff member the phone is for
    (leave empty for a shared ward phone).
-2. On the phone, open Clinic MRS and scan the QR code within 15 minutes. The app checks the licence, makes its
+2. On the phone, open Dental MRS and scan the QR code within 15 minutes. The app checks the licence, makes its
    hardware key and activates.
 3. Staff sign in with their own username and password.
 4. A lost or replaced phone: **Switch off** it in the list. Its sign-ins end immediately and it frees a place.

@@ -207,9 +207,9 @@ def verify(chain_b64: list[str], code: str) -> Attested:
         raise AttestationError("This phone keeps keys in software only. Use a phone with a secure area.")
     if info["boot_state"] in ("unverified", "failed"):
         raise AttestationError("This phone's system software has been modified. It cannot be activated.")
-    package = getattr(settings, "MOBILE_APP_PACKAGE", "et.clinicmrs.clinic_mrs")
+    package = getattr(settings, "MOBILE_APP_PACKAGE", "et.dentalmrs.dental_mrs")
     if info["packages"] and package not in info["packages"]:
-        raise AttestationError("The key was not made by the Clinic MRS app.")
+        raise AttestationError("The key was not made by the Dental MRS app.")
     allowed = [d.lower().replace(":", "") for d in getattr(settings, "MOBILE_APP_SIGNATURE_SHA256", []) if d]
     if allowed and not set(info["digests"]) & set(allowed):
         raise AttestationError("This copy of the app is not the one from your supplier. Install the official app.")

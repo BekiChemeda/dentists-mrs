@@ -26,7 +26,7 @@ from apps.devices import attestation, licence
 from apps.devices.models import ActivationCode, Installation, MobileDevice
 from conftest import PASSWORD
 
-PACKAGE = "et.clinicmrs.clinic_mrs"
+PACKAGE = "et.dentalmrs.dental_mrs"
 APP_DIGEST = hashlib.sha256(b"supplier signing certificate").hexdigest()
 
 
@@ -287,7 +287,7 @@ def test_password_is_not_tried_from_a_phone_that_is_not_activated(licensed, make
     ("another activation", {"challenge": b"\x00" * 32}, "different activation"),
     ("software key", {"level": 0}, "software"),
     ("modified system", {"boot": 2}, "modified"),
-    ("other app", {"package": "com.example.copy"}, "Clinic MRS app"),
+    ("other app", {"package": "com.example.copy"}, "Dental MRS app"),
 ])
 def test_weak_or_foreign_phones_are_refused(licensed, admin, problem, kwargs, message):
     code = new_code(admin)["code"]
