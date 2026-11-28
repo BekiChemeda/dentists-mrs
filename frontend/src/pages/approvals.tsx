@@ -16,11 +16,16 @@ export function ApprovalsPage() {
     `/approvals/?status=${view === "pending" ? "pending,approved" : "rejected,used,cancelled"}&page_size=100`,
   );
   const [rejecting, setRejecting] = useState<Approval | null>(null);
+  // One-person clinic: approving one's own request needs a written reason, kept in the audit log.
+  const [selfApproving, setSelfApproving] = useState<Approval | null>(null);
   const act = useAction(
     (v: { id: string; action: string; note?: string }) =>
       api.post(`/approvals/${v.id}/${v.action}/`, { note: v.note ?? "" }),
     [["approvals"], ["invoice"], ["prescriptions"]],
-    () => setRejecting(null),
+    () => {
+      setRejecting(null);
+      setSelfApproving(null);
+    },
   );
 
   return (
@@ -85,6 +90,11 @@ export function ApprovalsPage() {
                       {a.decision_note && (
                         <div className="small muted">
                           {a.decided_by?.full_name}: {a.decision_note}
+                          {a.self_approved && (
+                            <span className="badge badge-wait" style={{ marginLeft: 6 }}>
+                              {t("approvals.self_badge", "Own request, no other approver")}
+                            </span>
+                          )}
                         </div>
                       )}
                     </td>
@@ -98,7 +108,9 @@ export function ApprovalsPage() {
                             <button
                               className="btn btn-sm btn-primary"
                               disabled={act.isPending}
-                              onClick={() => act.mutate({ id: a.id, action: "approve" })}
+                              onClick={() =>
+                                a.self_approval ? setSelfApproving(a) : act.mutate({ id: a.id, action: "approve" })
+                              }
                             >
                               {t("approvals.approve", "Approve")}
                             </button>
@@ -138,6 +150,19 @@ export function ApprovalsPage() {
         error={act.error}
         onClose={() => setRejecting(null)}
         onConfirm={(note) => rejecting && act.mutate({ id: rejecting.id, action: "reject", note })}
+      />
+      <ReasonDialog
+        open={selfApproving !== null}
+        title={t("approvals.self_title", "Approve your own request")}
+        label={t(
+          "approvals.self_reason",
+          "Nobody else in the clinic can approve this. Write why you are approving it; the reason is kept in the audit log.",
+        )}
+        confirmLabel={t("approvals.approve", "Approve")}
+        busy={act.isPending}
+        error={act.error}
+        onClose={() => setSelfApproving(null)}
+        onConfirm={(note) => selfApproving && act.mutate({ id: selfApproving.id, action: "approve", note })}
       />
     </div>
   );

@@ -94,6 +94,19 @@ dispensing beyond recorded stock. For each, read the reason, open the invoice or
 needed, and **Approve** or **Reject** (with a reason). You cannot approve your own requests.
 *History* shows past decisions. Approvals waiting also appear on your dashboard and as notifications.
 
+### One-person clinic
+
+When one person runs the clinic (for example the dentist-owner also does reception and takes payments), nobody
+else can approve their refunds, discounts or voids. In *Clinic settings*, tick **One person runs the clinic**.
+Then:
+
+- On *Approvals*, **Approve** on your own request asks for a written reason. The decision is marked
+  **Own request, no other approver** in the history and recorded in the audit log.
+- It works only while no other active account can approve. As soon as you add a manager or director (or give
+  someone the approval permission), a second person is needed again, even with the setting on.
+- The owner's account needs the roles for every job they do, for example *Clinic director*, *Dentist*,
+  *Receptionist* and *Cashier*.
+
 ## 6. Patients
 
 You can register patients, correct details and manage the waiting list and appointments like

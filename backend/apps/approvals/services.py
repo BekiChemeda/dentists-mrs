@@ -45,13 +45,37 @@ def blocking_problem(req: ApprovalRequest) -> str | None:
     return None
 
 
+def other_approvers_exist(req: ApprovalRequest, user) -> bool:
+    """Another active account (not the requester) holds the permission to decide this request."""
+    from apps.accounts.models import User
+
+    permission = ApprovalRequest.PERMISSION_FOR_KIND[req.kind]
+    others = (User.objects.filter(is_active=True, roles__permissions__code=permission)
+              .exclude(pk=user.pk).distinct())
+    return any(permission in u.permission_codes for u in others)
+
+
+def may_self_approve(req: ApprovalRequest, user) -> bool:
+    """One-person clinic: the requester may decide their own request when the clinic says one person runs it
+    and nobody else could. In a clinic with an approver, the second person is always needed."""
+    from apps.core.models import ClinicSettings
+
+    return (req.requested_by_id == user.pk and ClinicSettings.get().solo_approvals
+            and user.has_permissions([ApprovalRequest.PERMISSION_FOR_KIND[req.kind]])
+            and not other_approvers_exist(req, user))
+
+
 @transaction.atomic
 def decide(ctx: ActorContext, req: ApprovalRequest, *, approve: bool, note: str = "") -> ApprovalRequest:
     req = ApprovalRequest.objects.select_for_update().get(pk=req.pk)
     if req.status != ApprovalRequest.Status.PENDING:
         raise ConflictError("This request has already been decided.")
-    if req.requested_by_id == ctx.user.pk:
+    own = req.requested_by_id == ctx.user.pk
+    if own and not may_self_approve(req, ctx.user):
         raise ConflictError("You cannot approve your own request.")
+    if own and not note.strip():
+        raise BusinessValidationError("Write why you are deciding your own request; it is kept in the audit log.",
+                                      fields={"note": ["Required."]})
     if not ctx.user.has_permissions([ApprovalRequest.PERMISSION_FOR_KIND[req.kind]]):
         from rest_framework.exceptions import PermissionDenied
 
@@ -64,9 +88,11 @@ def decide(ctx: ActorContext, req: ApprovalRequest, *, approve: bool, note: str 
     req.decided_by = ctx.user
     req.decided_at = timezone.now()
     req.decision_note = note.strip()
+    req.self_approved = own
     req.save()
     record_event(ctx, action="approval.approve" if approve else "approval.reject", object_type="approval",
-                 object_id=req.pk, details={"kind": req.kind, "note": req.decision_note})
+                 object_id=req.pk, details={"kind": req.kind, "note": req.decision_note,
+                                            **({"self_approved": True} if own else {})})
     notify_user(req.requested_by, kind="approval",
                 title=f"{req.get_kind_display()} {'approved' if approve else 'rejected'}",
                 body=req.summary + (f" — {req.decision_note}" if req.decision_note else ""), link="/approvals")

@@ -81,6 +81,7 @@ class ClinicSettingsSerializer(serializers.Serializer):
     auto_complete_minutes = serializers.IntegerField(min_value=0, max_value=480, required=False)
     bill_consultation_for_dental = serializers.BooleanField(required=False)
     setup_checklist_hidden = serializers.BooleanField(required=False)
+    solo_approvals = serializers.BooleanField(required=False)
     row_version = serializers.IntegerField(read_only=True)
 
     def validate_opening_hours(self, value):
