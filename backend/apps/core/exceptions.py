@@ -84,8 +84,10 @@ def _flatten_fields(detail) -> dict:
 def _flatten_list(value) -> list[str]:
     if isinstance(value, list):
         out: list[str] = []
-        for item in value:
-            out.extend(_flatten_list(item))
+        # A list of rows (e.g. prescription lines): say which row each message is about.
+        rows = len(value) > 0 and all(isinstance(item, dict) for item in value)
+        for i, item in enumerate(value):
+            out.extend(f"line {i + 1}, {m}" if rows else m for m in _flatten_list(item))
         return out
     if isinstance(value, dict):
         return [f"{k}: {msg}" for k, v in value.items() for msg in _flatten_list(v)]

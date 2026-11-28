@@ -431,6 +431,11 @@ CLINICAL_EVENT_LABELS = {"prescription": "Prescription written", "pharmacy.": "M
 CLINICAL_VIEW = ["clinical.view", "clinical.write", "dental.view", "dental.write", "lab.view", "pharmacy.view",
                  "triage.record"]
 
+# Invoice and payment lines name amounts, receipt numbers and payment methods: only billing staff see them.
+BILLING_VIEW = ["billing.view", "billing.invoice", "billing.payment"]
+BILLING_EVENT_LABELS = {"billing.issue": "Invoice issued", "billing.payment": "Payment recorded",
+                        "billing.refund": "Refund paid"}
+
 
 def _generic(kind: str) -> str:
     for prefix in sorted(CLINICAL_EVENT_LABELS, key=len, reverse=True):
@@ -446,11 +451,14 @@ class VisitTimelineView(PermissionedView):
         visit = get_object_or_404(Visit, pk=pk)
         events = VisitEvent.objects.filter(visit=visit).select_related("actor")
         data = VisitEventSerializer(events, many=True).data
-        if not request.user.has_any_permission(CLINICAL_VIEW):
-            for row in data:
-                kind = str(row.get("kind", ""))
-                if kind in CLINICAL_EVENT_KINDS or kind.startswith(CLINICAL_EVENT_PREFIXES):
-                    row["summary"] = _generic(row["kind"])
+        clinical = request.user.has_any_permission(CLINICAL_VIEW)
+        money = request.user.has_any_permission(BILLING_VIEW)
+        for row in data:
+            kind = str(row.get("kind", ""))
+            if not clinical and (kind in CLINICAL_EVENT_KINDS or kind.startswith(CLINICAL_EVENT_PREFIXES)):
+                row["summary"] = _generic(kind)
+            elif not money and kind.startswith("billing."):
+                row["summary"] = BILLING_EVENT_LABELS.get(kind, "Billing step recorded")
         return Response(data)
 
 

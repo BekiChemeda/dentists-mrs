@@ -42,6 +42,7 @@ export function DentalWorkspace() {
   const tab = (params.get("tab") as Tab) || "history";
   const setTab = (k: Tab) => setParams({ tab: k }, { replace: true });
   const [examDirty, setExamDirty] = useState(false);
+  const [historyDirty, setHistoryDirty] = useState(false);
   if (enc.isLoading) return <Loading />;
   if (!enc.data) return <ErrorBanner error={enc.error} />;
   const e = enc.data;
@@ -49,7 +50,7 @@ export function DentalWorkspace() {
   const open = e.status === "draft" && !["completed", "cancelled"].includes(e.visit_status);
   const writable = open && mine && can("dental.write");
   const tabs: { key: Tab; label: string; count?: number }[] = [
-    { key: "history", label: t("dental.tab_history", "History") },
+    { key: "history", label: `${t("dental.tab_history", "History")}${historyDirty ? " •" : ""}` },
     {
       key: "exam",
       label: `${t("dental.tab_exam", "Examination")}${examDirty ? " •" : ""}`,
@@ -100,8 +101,10 @@ export function DentalWorkspace() {
         </Banner>
       )}
       <Tabs tabs={tabs} value={tab} onChange={setTab} />
-      {tab === "history" && <HistoryTab encounter={e} summary={summary.data} writable={writable} />}
-      {/* Kept mounted so unsaved typing survives a look at another tab. */}
+      {/* History and examination stay mounted so unsaved typing survives a look at another tab. */}
+      <div hidden={tab !== "history"}>
+        <HistoryTab encounter={e} summary={summary.data} writable={writable} onDirty={setHistoryDirty} />
+      </div>
       <div hidden={tab !== "exam"}>
         <ExamTab encounter={e} writable={writable} onDirty={setExamDirty} />
       </div>
@@ -133,7 +136,9 @@ export function DentalWorkspace() {
           <OrthoPanel patientId={e.patient.id} encounterId={e.status === "draft" ? e.id : undefined} />
         </div>
       )}
-      {tab === "sign" && <SignTab encounter={e} writable={writable} unsaved={examDirty} />}
+      {tab === "sign" && (
+        <SignTab encounter={e} writable={writable} unsaved={examDirty} historyUnsaved={historyDirty} />
+      )}
     </div>
   );
 }
@@ -164,14 +169,24 @@ export function AlertStrip({ summary }: { summary?: DentalSummary }) {
 }
 
 // ---------------------------------------------------------------------------
+/** Answers that say something: a blank choice with no detail is the same as not answered. */
+function filledAnswers(a: Record<string, { answer: string; detail: string }> | undefined): string {
+  const rows = Object.entries(a ?? {})
+    .filter(([, v]) => v.answer || v.detail)
+    .sort(([x], [y]) => x.localeCompare(y));
+  return JSON.stringify(rows);
+}
+
 function HistoryTab({
   encounter,
   summary,
   writable,
+  onDirty,
 }: {
   encounter: DentalEncounter;
   summary?: DentalSummary;
   writable: boolean;
+  onDirty?: (dirty: boolean) => void;
 }) {
   const { t } = useTranslation();
   const catalog = useDentalCatalog();
@@ -184,6 +199,11 @@ function HistoryTab({
   useEffect(() => {
     if (last) setAnswers(last.answers);
   }, [last?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Typed but not recorded yet: warn before leaving the page or signing out, and mark the tab.
+  const dirty =
+    writable && (notes.trim() !== "" || allergies || meds || filledAnswers(answers) !== filledAnswers(last?.answers));
+  useUnsavedGuard(`risk-review-${encounter.id}`, dirty);
+  useEffect(() => onDirty?.(dirty), [dirty, onDirty]);
   const save = useMutation({
     mutationFn: () =>
       api.post<RiskReview>(`/dental/patients/${encounter.patient.id}/risk-reviews/`, {
@@ -193,10 +213,13 @@ function HistoryTab({
         notes,
         encounter_id: encounter.id,
       }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["dental"] });
+    onSuccess: async () => {
+      // Wait for the refreshed summary, so the alert line already shows this review when the toast appears.
+      await qc.invalidateQueries({ queryKey: ["dental"] });
       toast(t("dental.review_saved", "Medical history review recorded"));
       setNotes("");
+      setAllergies(false);
+      setMeds(false);
     },
   });
   const sh = summary?.shared_history;
@@ -354,8 +377,8 @@ export function ProfilePanel({
   useEffect(() => setF(profile as unknown as Record<string, string>), [profile]);
   const save = useMutation({
     mutationFn: () => api.patch(`/dental/patients/${patientId}/profile/`, f, { ifMatch: profile.row_version }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["dental", "summary"] });
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["dental", "summary"] });
       setEditing(false);
       toast(t("common.saved_toast", "Changes saved"));
     },
@@ -840,6 +863,10 @@ const EMPTY_LINE: RxLine = {
   allergy_override_reason: "",
 };
 
+function isBlankLine(l: RxLine): boolean {
+  return !l.item_id && ![l.drug_name, l.dose, l.duration_days, l.quantity, l.instructions].some((v) => v.trim());
+}
+
 function PrescriptionsTab({ encounter, writable }: { encounter: DentalEncounter; writable: boolean }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -852,16 +879,18 @@ function PrescriptionsTab({ encounter, writable }: { encounter: DentalEncounter;
       ? `/inventory/items/${queryString({ category: "medicine", active: "true", q: search, page_size: 8 })}`
       : null,
   );
+  // A row left empty (e.g. "Add a medicine" clicked once too often) is not sent.
+  const filled = lines.filter((l) => !isBlankLine(l));
   const send = useMutation({
     mutationFn: () =>
       api.post(`/dental/encounters/${encounter.id}/prescriptions/`, {
-        items: lines.map((l) => ({
+        items: filled.map((l) => ({
           ...l,
           duration_days: l.duration_days ? Number(l.duration_days) : null,
         })),
       }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["dental", "encounter", encounter.id] });
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["dental", "encounter", encounter.id] });
       setLines([{ ...EMPTY_LINE }]);
       toast(t("dental.rx_saved", "Prescription saved"));
     },
@@ -926,6 +955,21 @@ function PrescriptionsTab({ encounter, writable }: { encounter: DentalEncounter;
           <ErrorBanner error={send.error} />
           {lines.map((l, i) => (
             <div key={i} className="form-grid-4 fieldset">
+              {lines.length > 1 && (
+                <div className="row-between" style={{ gridColumn: "1 / -1" }}>
+                  <strong className="small">{t("dental.rx_line_n", "Medicine {{n}}", { n: i + 1 })}</strong>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-ghost"
+                    onClick={() => {
+                      setLines((c) => c.filter((_, j) => j !== i));
+                      setFocus(0);
+                    }}
+                  >
+                    {t("dental.rx_remove_line", "Remove")}
+                  </button>
+                </div>
+              )}
               <Field label={t("dental.medicine", "Medicine")} id={`f-drug-${i}`}>
                 <input
                   id={`f-drug-${i}`}
@@ -1006,7 +1050,11 @@ function PrescriptionsTab({ encounter, writable }: { encounter: DentalEncounter;
             <button type="button" className="btn" onClick={() => setLines((c) => [...c, { ...EMPTY_LINE }])}>
               {t("dental.add_line", "Add a medicine")}
             </button>
-            <button className="btn btn-primary" onClick={() => send.mutate()} disabled={send.isPending}>
+            <button
+              className="btn btn-primary"
+              onClick={() => send.mutate()}
+              disabled={send.isPending || filled.length === 0}
+            >
               {t("dental.save_rx", "Save prescription")}
             </button>
           </div>
@@ -1021,12 +1069,33 @@ function SignTab({
   encounter,
   writable,
   unsaved,
+  historyUnsaved = false,
 }: {
   encounter: DentalEncounter;
   writable: boolean;
   unsaved: boolean;
+  historyUnsaved?: boolean;
 }) {
   const { t } = useTranslation();
+  // The structured answers of the complaint page (not free text), so the printed report carries them too.
+  const e = encounter;
+  const structured: [string, string][] = [];
+  if (e.pain_present != null)
+    structured.push([t("dental.pain_present", "Pain"), e.pain_present ? t("common.yes", "Yes") : t("common.no", "No")]);
+  if (e.pain_teeth.length) structured.push([t("dental.pain_teeth", "Painful teeth"), e.pain_teeth.join(", ")]);
+  if (e.pain_severity != null) structured.push([t("dental.pain_severity", "Severity (0–10)"), `${e.pain_severity}/10`]);
+  if (e.pain_pattern)
+    structured.push([
+      t("dental.pain_pattern", "Pattern"),
+      e.pain_pattern === "continuous" ? t("dental.continuous", "Continuous") : t("dental.intermittent", "Intermittent"),
+    ]);
+  if (e.pain_sensitivity.length)
+    structured.push([
+      t("dental.sensitivity", "Sensitive to"),
+      e.pain_sensitivity.map((x) => t(`dental.sens_${x}`, x.charAt(0).toUpperCase() + x.slice(1))).join(", "),
+    ]);
+  if (e.mouth_opening_mm != null)
+    structured.push([t("dental.mouth_opening", "Mouth opening (mm)"), String(e.mouth_opening_mm)]);
   const qc = useQueryClient();
   const { can } = useAuth();
   const [amendField, setAmendField] = useState<string | null>(null);
@@ -1081,6 +1150,14 @@ function SignTab({
               )}
             </Banner>
           )}
+          {historyUnsaved && (
+            <Banner tone="warn">
+              {t(
+                "dental.unsaved_history",
+                "The medical history review has answers or notes that are not recorded yet. Click Record review on the History tab before signing.",
+              )}
+            </Banner>
+          )}
           {drafts.length > 0 && (
             <Banner tone="warn">
               {t(
@@ -1097,7 +1174,11 @@ function SignTab({
           </p>
           {writable && (
             <div className="form-actions">
-              <button className="btn btn-primary" onClick={() => sign.mutate()} disabled={sign.isPending || unsaved}>
+              <button
+                className="btn btn-primary"
+                onClick={() => sign.mutate()}
+                disabled={sign.isPending || unsaved || historyUnsaved}
+              >
                 {t("dental.sign", "Sign")}
               </button>
             </div>
@@ -1122,6 +1203,18 @@ function SignTab({
               {sexAge(encounter.patient, t)} · Dr. {encounter.dentist.full_name} · {t("dental.signed_at", "Signed")}{" "}
               {formatDateTime(encounter.signed_at)}
             </p>
+            {structured.length > 0 && (
+              <div className="note-section">
+                <strong>{t("dental.report_pain_exam", "Pain and measurements")}</strong>
+                <ul>
+                  {structured.map(([label, v]) => (
+                    <li key={label}>
+                      {label}: {v}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {NOTE_GROUPS.flatMap((g) => g.fields)
               .filter(([k]) => value(k))
               .map(([k]) => (
@@ -1226,8 +1319,8 @@ function FollowUpPanel({ encounter }: { encounter: DentalEncounter }) {
         note,
         encounter_id: encounter.id,
       }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["dental"] });
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["dental"] });
       toast(t("dental.recall_added", "Follow-up added to the recall list"));
       setDue("");
       setNote("");

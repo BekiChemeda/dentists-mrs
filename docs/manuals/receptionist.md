@@ -92,8 +92,9 @@ Appointments marked **Follow-up booked by the doctor** were booked from a consul
 
 ## 5. Run the waiting list
 
-*Waiting list* has four tabs: **Waiting for triage**, **Waiting for doctors**, **Being managed**,
-**Completed visits**. Each row shows the ticket, name, MRN, age, sex and waiting time.
+*Waiting list* has five tabs: **Waiting for triage**, **Waiting for doctors**, **Being managed**,
+**Finishing** (seen by the doctor; payment, pharmacy or booking may still be open) and **Completed visits**
+(closed with **Complete visit**). Each row shows the ticket, name, MRN, age, sex and waiting time.
 
 Actions on a row:
 
@@ -112,7 +113,8 @@ day's reports are correct.
 
 When the patient has finished (seen by the doctor, tests done, medicines given, paid):
 
-1. *Waiting list › **Being managed*** or ***Completed visits***, click **Complete visit**.
+1. *Waiting list › **Being managed*** or ***Finishing***, click **Complete visit**. The patient then moves
+   to **Completed visits**.
 2. The dialog lists anything still open: **Unsigned notes**, **Laboratory not finished**,
    **Medicines not dispensed**, **Not yet invoiced**, and any **Unpaid balance**. An unsigned note
    must be signed by the doctor before the visit can close; ask the doctor.

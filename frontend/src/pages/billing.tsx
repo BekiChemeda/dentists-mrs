@@ -383,11 +383,7 @@ export function InvoicePage() {
               {a.problem}
             </span>
             {a.status === "approved" && (a.requested_by.id === user?.id || can("billing.discount.approve")) && (
-              <button
-                className="btn btn-sm"
-                disabled={closeStale.isPending}
-                onClick={() => closeStale.mutate(a.id)}
-              >
+              <button className="btn btn-sm" disabled={closeStale.isPending} onClick={() => closeStale.mutate(a.id)}>
                 {t("approvals.close_stale", "Close without applying")}
               </button>
             )}
@@ -812,7 +808,14 @@ function RecordPaymentForm({ invoice, onDone }: { invoice: Invoice; onDone: (p: 
   const [reference, setReference] = useState("");
   const [tendered, setTendered] = useState("");
   const pay = useAction(
-    () => api.post<Invoice>(`/billing/invoices/${invoice.id}/payments/`, { amount, method, reference }),
+    () =>
+      api.post<Invoice>(`/billing/invoices/${invoice.id}/payments/`, {
+        amount,
+        method,
+        reference,
+        // Kept with the payment so the receipt can show the cash received and the change given.
+        amount_tendered: method === "cash" && Number(tendered) > 0 ? tendered : null,
+      }),
     [["invoice", invoice.id], ["invoices"], ["billing"], ["payments"]],
     (res) => res.new_payment && onDone(res.new_payment),
   );
@@ -1104,9 +1107,31 @@ function Receipt({ invoice, payment }: { invoice: Invoice; payment: Payment }) {
               </td>
               <td className="num">{money(payment.amount)}</td>
             </tr>
+            {payment.amount_tendered != null && (
+              <>
+                <tr>
+                  <td>{t("billing.cash_received", "Cash received")}</td>
+                  <td className="num">{money(payment.amount_tendered)}</td>
+                </tr>
+                <tr>
+                  <td>{t("billing.change_given", "Change given")}</td>
+                  <td className="num">{money(payment.change_given ?? "0")}</td>
+                </tr>
+              </>
+            )}
+            {Number(payment.refunded ?? 0) > 0 && (
+              <tr>
+                <td>{t("billing.refunded_from_payment", "Refunded from this payment")}</td>
+                <td className="num">−{money(payment.refunded ?? "0")}</td>
+              </tr>
+            )}
             <tr>
-              <td>{t("billing.balance", "Balance")}</td>
-              <td className="num">{money(invoice.balance)}</td>
+              <td>
+                {payment.balance_after != null
+                  ? t("billing.balance_after", "Balance after this payment")
+                  : t("billing.balance_now", "Balance now")}
+              </td>
+              <td className="num">{money(payment.balance_after ?? invoice.balance)}</td>
             </tr>
           </tbody>
         </table>

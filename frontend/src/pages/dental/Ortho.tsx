@@ -166,9 +166,12 @@ const KINDS_WHEN: Record<string, string[]> = {
 // separate procedures from the catalogue.
 const CHARGED_BY_DEFAULT = ["adjustment", "aligner", "emergency", "retention_review"];
 
-function invalidate(qc: ReturnType<typeof useQueryClient>) {
-  void qc.invalidateQueries({ queryKey: ["dental", "ortho"] });
-  void qc.invalidateQueries({ queryKey: ["dental", "summary"] });
+/** Refresh the orthodontic data; awaited, so a save is reported only once the page shows it. */
+async function invalidate(qc: ReturnType<typeof useQueryClient>) {
+  await Promise.all([
+    qc.invalidateQueries({ queryKey: ["dental", "ortho"] }),
+    qc.invalidateQueries({ queryKey: ["dental", "summary"] }),
+  ]);
 }
 
 // ---------------------------------------------------------------------------------------------------------- assessment
@@ -420,8 +423,8 @@ function OrthoCaseDetail({ c, encounterId, patientId }: { c: OrthoCase; encounte
   const act = useMutation({
     mutationFn: ({ action, reason, on_date }: { action: string; reason?: string; on_date?: string }) =>
       api.post<OrthoCase>(`/dental/ortho/cases/${c.id}/${action}/`, { reason: reason ?? "", on_date }),
-    onSuccess: () => {
-      invalidate(qc);
+    onSuccess: async () => {
+      await invalidate(qc);
       setDialog(null);
       toast("Saved");
     },
@@ -429,15 +432,15 @@ function OrthoCaseDetail({ c, encounterId, patientId }: { c: OrthoCase; encounte
   const voidVisit = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason: string }) =>
       api.post<OrthoCase>(`/dental/ortho/visits/${id}/void/`, { reason }),
-    onSuccess: () => {
-      invalidate(qc);
+    onSuccess: async () => {
+      await invalidate(qc);
       setVoiding(null);
     },
   });
   const forward = useMutation({
     mutationFn: (id: string) => api.post<OrthoCase>(`/dental/ortho/instalments/${id}/bring-forward/`, {}),
-    onSuccess: () => {
-      invalidate(qc);
+    onSuccess: async () => {
+      await invalidate(qc);
       toast(t("dental.ortho_brought_forward", "Due today: the cashier can now collect it"));
     },
   });
@@ -1015,8 +1018,8 @@ function NewCaseForm({
         assessment_id: f.assessment_id || null,
         expected_months: f.expected_months || null,
       }),
-    onSuccess: () => {
-      invalidate(qc);
+    onSuccess: async () => {
+      await invalidate(qc);
       toast(t("dental.ortho_case_created", "Orthodontic case created"));
       onDone();
     },
@@ -1152,8 +1155,8 @@ function BillingForm({ c, onDone }: { c: OrthoCase; onDone: () => void }) {
   const set = (k: string, v: string) => setF((x) => ({ ...x, [k]: v }));
   const save = useMutation({
     mutationFn: () => api.post<OrthoCase>(`/dental/ortho/cases/${c.id}/billing/`, { ...f, row_version: c.version }),
-    onSuccess: () => {
-      invalidate(qc);
+    onSuccess: async () => {
+      await invalidate(qc);
       toast("Saved");
       onDone();
     },
@@ -1238,8 +1241,8 @@ function DetailsForm({ c, onDone }: { c: OrthoCase; onDone: () => void }) {
         expected_months: f.expected_months || null,
         retention_review_months: f.retention_review_months || null,
       }),
-    onSuccess: () => {
-      invalidate(qc);
+    onSuccess: async () => {
+      await invalidate(qc);
       toast("Saved");
       onDone();
     },
@@ -1339,8 +1342,8 @@ function VisitForm({ c, encounterId, onDone }: { c: OrthoCase; encounterId?: str
         extra_charge: f.extra_charge || null,
         charge_this_visit: charge,
       }),
-    onSuccess: () => {
-      invalidate(qc);
+    onSuccess: async () => {
+      await invalidate(qc);
       toast(t("dental.ortho_visit_saved", "Orthodontic visit recorded"));
       onDone();
     },

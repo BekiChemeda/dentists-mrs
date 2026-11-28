@@ -34,6 +34,6 @@ book a visit.
 
 ## Completing the visit
 
-After the dentist signs and the cashier takes payment, complete the visit from *Waiting list › Completed visits*
-as usual. The dialog lists anything still open: an unsigned dental examination or procedure record (ask the
+After the dentist signs and the cashier takes payment, complete the visit from *Waiting list › Finishing*
+as usual; the patient then moves to **Completed visits**. The dialog lists anything still open: an unsigned dental examination or procedure record (ask the
 dentist), or an unpaid balance.

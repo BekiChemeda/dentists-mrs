@@ -167,7 +167,7 @@ def test_toothache_to_filling_invoice_and_follow_up(as_role, unique):
     cashier.wait_for_selector("#receipt")
 
     # Reception closes the visit.
-    waiting_row(rc, name, "done").get_by_role("button", name="Complete visit").click()
+    waiting_row(rc, name, "finishing").get_by_role("button", name="Complete visit").click()
     rc.locator("dialog[open] .form-actions").get_by_role("button", name="Complete visit").click()
     expect(waiting_row(rc, name, "done")).to_contain_text("Care completed")
 

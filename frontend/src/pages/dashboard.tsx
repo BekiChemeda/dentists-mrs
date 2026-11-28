@@ -187,7 +187,7 @@ function QueueBlock() {
         </div>
         <div className="figure">
           <b>{count("completed")}</b>
-          <span>{t("dash.seen", "Visits completed")}</span>
+          <span>{t("dash.seen", "Completed visits")}</span>
         </div>
         <div className={`figure${longest >= 60 ? " danger" : ""}`}>
           <b>{q.data ? waitLabel(longest) || "0 min" : "–"}</b>

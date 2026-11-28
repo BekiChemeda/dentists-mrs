@@ -31,7 +31,7 @@ import { VitalsForm } from "./vitals";
 import { CompleteVisitDialog } from "./complete-visit";
 type QueueAction = { kind: "skip" | "remove" | "reassign" | "complete"; visit: Visit } | null;
 
-type QueueTab = "triage" | "doctor" | "managed" | "done";
+type QueueTab = "triage" | "doctor" | "managed" | "finishing" | "done";
 
 const sexShort = (sex: string) => (sex === "female" ? "F" : sex === "male" ? "M" : "");
 
@@ -90,7 +90,8 @@ export function QueuePage() {
   const triageOn = moduleOn("triage");
   const defaultTab: QueueTab = !triageOn || (clinician && !can("triage.record")) ? "doctor" : "triage";
   const asked = params.get("tab") as QueueTab | null;
-  const tab = asked && !(asked === "triage" && !triageOn) ? asked : defaultTab;
+  const known: QueueTab[] = ["triage", "doctor", "managed", "finishing", "done"];
+  const tab = asked && known.includes(asked) && !(asked === "triage" && !triageOn) ? asked : defaultTab;
 
   const update = useAction(
     (v: { id: string; body: Record<string, unknown> }) => api.patch(`/visits/${v.id}/`, v.body),
@@ -149,7 +150,9 @@ export function QueuePage() {
     triage: visits.filter((v) => v.status === "waiting_triage"),
     doctor: visits.filter((v) => v.status === "waiting_doctor"),
     managed: visits.filter((v) => v.status === "in_consultation"),
-    done: [...visits.filter((v) => v.status === "after_consult"), ...visits.filter((v) => v.status === "completed")],
+    // Seen, but payment, pharmacy or booking may still be open; "Complete visit" moves them to the last tab.
+    finishing: visits.filter((v) => v.status === "after_consult"),
+    done: visits.filter((v) => v.status === "completed"),
   };
   const tabs: { key: QueueTab; label: string; count: number }[] = [
     ...(triageOn
@@ -157,6 +160,7 @@ export function QueuePage() {
       : []),
     { key: "doctor", label: t("queue.lane_doctor", "Waiting for doctors"), count: byTab.doctor.length },
     { key: "managed", label: t("queue.lane_consult", "Being managed"), count: byTab.managed.length },
+    { key: "finishing", label: t("queue.lane_finishing", "Finishing"), count: byTab.finishing.length },
     { key: "done", label: t("queue.lane_after", "Completed visits"), count: byTab.done.length },
   ];
   const rows = byTab[tab];
@@ -503,7 +507,7 @@ export function QueuePage() {
                   </tbody>
                 </>
               )}
-              {tab === "done" && (
+              {(tab === "finishing" || tab === "done") && (
                 <>
                   {head([t("queue.doctor", "Doctor"), t("queue.diagnosis", "Diagnosis"), t("queue.status", "Status")])}
                   <tbody>

@@ -287,7 +287,8 @@ def issue_invoice(ctx: ActorContext, invoice: Invoice) -> Invoice:
 
 
 @transaction.atomic
-def record_payment(ctx: ActorContext, invoice: Invoice, *, amount, method: str, reference: str = "") -> Payment:
+def record_payment(ctx: ActorContext, invoice: Invoice, *, amount, method: str, reference: str = "",
+                   amount_tendered=None) -> Payment:
     invoice = _lock(invoice)
     amount = money(amount)
     if invoice.status not in (Invoice.Status.ISSUED, Invoice.Status.PARTIAL):
@@ -312,15 +313,25 @@ def record_payment(ctx: ActorContext, invoice: Invoice, *, amount, method: str, 
                 fields={"amount": [f"Maximum {most} until the discount is settled."]})
     if method != Payment.Method.CASH and not reference.strip():
         raise BusinessValidationError("Enter the transaction reference.", fields={"reference": ["Required."]})
+    if amount_tendered is not None:
+        amount_tendered = money(amount_tendered)
+        if method != Payment.Method.CASH:
+            raise BusinessValidationError("Cash received is only recorded for cash payments.",
+                                          fields={"amount_tendered": ["Cash payments only."]})
+        if amount_tendered < amount:
+            raise BusinessValidationError(f"The cash received ({amount_tendered} ETB) is less than the payment "
+                                          f"({amount} ETB).", fields={"amount_tendered": [f"At least {amount}."]})
     year = timezone.localdate().year
-    payment = Payment.objects.create(receipt_number=f"RCT-{year}-{next_number('receipt', str(year)):06d}",
-                                     invoice=invoice, amount=amount, method=method, reference=reference.strip(),
-                                     received_by=ctx.user)
     invoice.amount_paid += amount
     invoice.status = Invoice.Status.PAID if invoice.amount_paid == invoice.total else Invoice.Status.PARTIAL
     invoice.save()
+    payment = Payment.objects.create(receipt_number=f"RCT-{year}-{next_number('receipt', str(year)):06d}",
+                                     invoice=invoice, amount=amount, method=method, reference=reference.strip(),
+                                     amount_tendered=amount_tendered, balance_after=invoice.total - invoice.amount_paid,
+                                     received_by=ctx.user)
     record_event(ctx, action="payment.record", object_type="invoice", object_id=invoice.pk,
-                 details={"receipt": payment.receipt_number, "amount": str(amount), "method": method})
+                 details={"receipt": payment.receipt_number, "amount": str(amount), "method": method,
+                          **({"tendered": str(amount_tendered)} if amount_tendered is not None else {})})
     if invoice.visit_id:
         visit_event(ctx, invoice.visit_id, "billing.payment",
                     f"Payment {amount} ETB ({payment.get_method_display()}), receipt {payment.receipt_number}")

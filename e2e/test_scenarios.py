@@ -75,7 +75,7 @@ def test_outpatient_visit_through_every_role(as_role, unique):
     pay_visit(cashier, name)
 
     rc2 = as_role("reception")
-    waiting_row(rc2, name, "done").get_by_role("button", name="Complete visit").click()
+    waiting_row(rc2, name, "finishing").get_by_role("button", name="Complete visit").click()
     rc2.wait_for_selector("text=Nothing is outstanding")
     rc2.locator("dialog[open] .form-actions").get_by_role("button", name="Complete visit").click()
     assert "Care completed" in waiting_row(rc2, name, "done").inner_text()
@@ -97,7 +97,7 @@ def test_laboratory_only_visit(as_role, unique):
     rc.fill("#lw-fac", "Example Health Centre")
     rc.check("dialog[open] label.check:has-text('Haemoglobin') input")
     rc.click("dialog[open] button:has-text('Send to laboratory')")
-    row = waiting_row(rc, name, "done")
+    row = waiting_row(rc, name, "finishing")
     assert "Laboratory only" in row.inner_text()
 
     lab = as_role("lab")
@@ -114,7 +114,7 @@ def test_laboratory_only_visit(as_role, unique):
     assert "Lab: Haemoglobin" in invoice and "Consultation" not in invoice
 
     rc2 = as_role("reception")
-    waiting_row(rc2, name, "done").get_by_role("button", name="Complete visit").click()
+    waiting_row(rc2, name, "finishing").get_by_role("button", name="Complete visit").click()
     rc2.wait_for_selector("text=Nothing is outstanding")
     rc2.locator("dialog[open] .form-actions").get_by_role("button", name="Complete visit").click()
     assert "Care completed" in waiting_row(rc2, name, "done").inner_text()

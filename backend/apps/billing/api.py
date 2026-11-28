@@ -39,7 +39,13 @@ class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payment
         fields = ["id", "receipt_number", "invoice", "invoice_number", "patient_name", "amount", "method", "reference",
-                  "received_by", "received_at", "refunded", "refundable"]
+                  "amount_tendered", "change_given", "balance_after", "received_by", "received_at", "refunded",
+                  "refundable"]
+
+    change_given = serializers.SerializerMethodField()
+
+    def get_change_given(self, obj) -> str | None:
+        return None if obj.amount_tendered is None else str(obj.amount_tendered - obj.amount)
 
     refunded = serializers.SerializerMethodField()
     refundable = serializers.SerializerMethodField()
@@ -187,6 +193,8 @@ class PaymentInput(serializers.Serializer):
     amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.01"))
     method = serializers.ChoiceField(choices=Payment.Method.choices)
     reference = serializers.CharField(max_length=80, required=False, allow_blank=True, default="")
+    amount_tendered = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.01"),
+                                               required=False, allow_null=True, default=None)
 
 
 class AmountReasonInput(serializers.Serializer):

@@ -714,7 +714,7 @@ function LabOnlyForm({ patient, onDone }: { patient: PatientBrief; onDone: () =>
     [["visits"], ["lab"]],
     () => {
       onDone();
-      navigate("/queue?tab=done");
+      navigate("/queue?tab=finishing");
     },
     t("queue.lab_only_toast", "Sent to the laboratory"),
   );

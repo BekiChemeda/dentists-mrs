@@ -310,3 +310,19 @@ def test_visit_timeline_hides_clinical_detail_from_non_clinical_staff(dental, ex
                 assert mine["summary"] in ("Dental examination step recorded", "Dental procedure recorded")
             else:
                 assert mine["summary"] == full["summary"]
+
+
+def test_visit_timeline_hides_money_from_staff_without_billing_access(dental, exam):
+    from apps.scheduling.models import VisitEvent
+
+    p, v, enc = exam()
+    VisitEvent.objects.create(visit_id=v["id"], kind="billing.issue", summary="Invoice INV-1 issued: 7000.00 ETB")
+    VisitEvent.objects.create(visit_id=v["id"], kind="billing.payment",
+                              summary="Payment 3500.00 ETB cash, receipt RCT-1")
+    cashier = ok(dental.cashier.get(f"/api/v1/visits/{v['id']}/timeline/"))
+    assert {"Invoice INV-1 issued: 7000.00 ETB", "Payment 3500.00 ETB cash, receipt RCT-1"} <= {
+        r["summary"] for r in cashier}
+    rows = ok(dental.imaging_staff.get(f"/api/v1/visits/{v['id']}/timeline/"))
+    billing = [r["summary"] for r in rows if r["kind"].startswith("billing.")]
+    assert sorted(billing) == ["Invoice issued", "Payment recorded"]
+    assert not any("ETB" in r["summary"] or "RCT" in r["summary"] for r in rows)
