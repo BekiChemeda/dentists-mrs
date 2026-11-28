@@ -12,7 +12,8 @@ export BACKUP_DIR
 export BACKUP_COPY_DIR="" MRS_RESTORE_CONFIRM=yes MRS_SKIP_PRE_RESTORE_BACKUP=yes STOP_API=true START_API=true
 # Dental image files: a synthetic image directory, mirrored by backup.sh and put back by restore.sh.
 IMAGE_DIR="$(mktemp -d)"
-export IMAGE_DIR MRS_SKIP_IMAGE_VERIFY=yes IMAGE_OWNER="$(id -u):$(id -g)"
+IMAGE_OWNER="$(id -u):$(id -g)"
+export IMAGE_DIR MRS_SKIP_IMAGE_VERIFY=yes IMAGE_OWNER
 mkdir -p "$IMAGE_DIR/ab"
 printf 'synthetic radiograph bytes' > "$IMAGE_DIR/ab/abc123.png"
 printf 'partial' > "$IMAGE_DIR/ab/.abc124.png.partial"

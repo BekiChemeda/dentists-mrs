@@ -4,9 +4,7 @@
 
 export function isFocusedNumberInput(target: EventTarget | null): target is HTMLInputElement {
   return (
-    target instanceof HTMLInputElement &&
-    target.type === "number" &&
-    target.ownerDocument.activeElement === target
+    target instanceof HTMLInputElement && target.type === "number" && target.ownerDocument.activeElement === target
   );
 }
 

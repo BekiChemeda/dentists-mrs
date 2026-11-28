@@ -896,7 +896,7 @@ export function useRegisterParam() {
 }
 
 // ---------------------------------------------------------------------------- record status
-type TFn = (key: string, fallback: string, opts?: Record<string, unknown>) => string;
+type TFn = (key: string, fallback: string) => string;
 
 export function inactiveLabel(kind: Patient["inactive_kind"], t: TFn): string {
   if (kind === "deceased") return t("patients.kind_deceased", "deceased");
