@@ -18,6 +18,8 @@ make_copy() {
     local dir="$1"
     mkdir -p "$dir/deploy/certs" "$dir/deploy/scripts"
     cp "$SRC/docker-compose.yml" "$SRC/.env.example" "$dir/"
+    # Dental images go in a folder of the test, not /var/lib/mrs: the test does not run as root.
+    sed -i "s|^IMAGE_DIR=.*|IMAGE_DIR=$dir/images|" "$dir/.env.example"
     cp "$SRC/deploy/install.sh" "$dir/deploy/"
     cp -r "$SRC/deploy/systemd" "$dir/deploy/"
     cp "$SRC/deploy/scripts/make-certs.sh" "$dir/deploy/scripts/"
@@ -68,6 +70,11 @@ chmod +x "$BIN/dpkg" "$BIN/apt-get"
 cat > "$BIN/systemctl" <<EOF
 #!/usr/bin/env bash
 echo "systemctl \$*" >> "$WORK/calls"
+EOF
+# Giving the image folder to the container's user (uid 10001) needs root: recorded instead.
+cat > "$BIN/chown" <<EOF
+#!/usr/bin/env bash
+echo "chown \$*" >> "$WORK/calls"
 EOF
 cat > "$BIN/timedatectl" <<'EOF'
 #!/usr/bin/env bash
