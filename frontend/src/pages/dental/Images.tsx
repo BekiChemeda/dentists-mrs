@@ -203,6 +203,9 @@ function ImageViewer({ image, onClose }: { image: DentalImage; onClose: () => vo
   const [withdrawing, setWithdrawing] = useState(false);
   const [replacing, setReplacing] = useState(false);
   const [zoom, setZoom] = useState(1);
+  // Withdrawn images are hidden from the record; image managers can still open one on purpose (it is audited).
+  const [showWithdrawnImage, setShowWithdrawnImage] = useState(false);
+  const visible = image.status === "active" || showWithdrawnImage;
   const withdraw = useMutation({
     mutationFn: (reason: string) => api.post(`/dental/images/${image.id}/withdraw/`, { reason }),
     onSuccess: () => {
@@ -213,7 +216,19 @@ function ImageViewer({ image, onClose }: { image: DentalImage; onClose: () => vo
   if (replacing) return <UploadForm patientId={image.patient} replaces={image} onDone={onClose} />;
   return (
     <div className="stack-sm">
-      {image.status === "active" ? (
+      {image.status !== "active" && (
+        <Banner tone="warn">
+          {t("dental.withdrawn_reason", "Withdrawn")}: {image.withdrawn_reason}
+        </Banner>
+      )}
+      {image.status !== "active" && !showWithdrawnImage && can("dental.imaging.manage") && (
+        <div>
+          <button type="button" className="btn btn-sm" onClick={() => setShowWithdrawnImage(true)}>
+            {t("dental.view_withdrawn", "View the withdrawn image (recorded in the audit trail)")}
+          </button>
+        </div>
+      )}
+      {visible && (
         <>
           <div className="row">
             <button className="btn btn-sm" onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}>
@@ -235,10 +250,6 @@ function ImageViewer({ image, onClose }: { image: DentalImage; onClose: () => vo
             />
           </div>
         </>
-      ) : (
-        <Banner tone="warn">
-          {t("dental.withdrawn_reason", "Withdrawn")}: {image.withdrawn_reason}
-        </Banner>
       )}
       <dl className="facts small">
         <dt>{t("dental.teeth", "Teeth")}</dt>

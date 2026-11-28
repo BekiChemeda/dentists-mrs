@@ -9,6 +9,7 @@ import { useGet } from "../../api/hooks";
 import type { Paginated, PersonBrief } from "../../api/types";
 import { useAuth } from "../../auth/AuthContext";
 import {
+  Badge,
   Banner,
   Empty,
   ErrorBanner,
@@ -821,6 +822,7 @@ function ProcedureCatalogue() {
   const catalog = useDentalCatalog();
   const [editing, setEditing] = useState<DentalProcedure | "new" | null>(null);
   const cats = Object.fromEntries(catalog.data?.procedure_categories ?? []);
+  const unpriced = (q.data ?? []).filter((p) => p.is_active && Number(p.price) <= 0);
   return (
     <Panel
       flush
@@ -831,6 +833,15 @@ function ProcedureCatalogue() {
       }
       title={t("dental.procedures_prices", "Procedures and prices")}
     >
+      {unpriced.length > 0 && (
+        <Banner tone="warn">
+          {t(
+            "dental.unpriced_procedures",
+            "{{count}} active procedures have no price. A procedure signed at 0 ETB keeps that price on the bill. Set the prices, or switch off what the clinic does not offer.",
+            { count: unpriced.length },
+          )}
+        </Banner>
+      )}
       {q.isLoading ? (
         <Loading />
       ) : (
@@ -852,7 +863,13 @@ function ProcedureCatalogue() {
                 <td className="mono small">{p.code}</td>
                 <td>{p.name}</td>
                 <td>{cats[p.category] ?? p.category}</td>
-                <td className="num">{money(p.price)}</td>
+                <td className="num">
+                  {p.is_active && Number(p.price) <= 0 ? (
+                    <Badge tone="danger">{t("dental.no_price", "No price")}</Badge>
+                  ) : (
+                    money(p.price)
+                  )}
+                </td>
                 <td className="small">
                   {p.billing_mode === "per_session"
                     ? t("dental.per_session", "Per session")

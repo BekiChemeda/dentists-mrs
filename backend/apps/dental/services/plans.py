@@ -118,6 +118,23 @@ def _lock(plan: TreatmentPlan) -> TreatmentPlan:
     return TreatmentPlan.objects.select_for_update().get(pk=plan.pk)
 
 
+def lock_item(item_id) -> tuple[TreatmentPlanItem, TreatmentPlan]:
+    """
+    Lock a plan item and its plan. Always the plan first, then the item: every path that locks both must use this
+    order, or two people working on the same plan can deadlock each other.
+    """
+    plan_id = TreatmentPlanItem.objects.values_list("plan_id", flat=True).get(pk=item_id)
+    plan = TreatmentPlan.objects.select_for_update().get(pk=plan_id)
+    # of=self: lock the item row only, never the procedure catalogue row every other signing also reads.
+    item = (TreatmentPlanItem.objects.select_for_update(of=("self",)).select_related("plan", "procedure")
+            .get(pk=item_id))
+    return item, plan
+
+
+def _has_unsigned_record(item: TreatmentPlanItem) -> bool:
+    return item.procedures.filter(status="draft").exists()
+
+
 def _require_open(plan: TreatmentPlan) -> None:
     if plan.status in (P.COMPLETED, P.CANCELLED, P.EXPIRED):
         raise ConflictError(f"This plan is {plan.get_status_display().lower()}. Start a new plan for further "
@@ -214,12 +231,18 @@ def add_item(ctx: ActorContext, plan: TreatmentPlan, data: dict, *, reason: str 
         if diagnosis is None:
             raise BusinessValidationError("Unknown diagnosis.", fields={"diagnosis_id": ["Not found."]})
         same_patient(diagnosis, plan.patient_id, "diagnosis_id")
-    fee = procedure.price if data.get("estimated_fee") in (None, "") else _money(data["estimated_fee"])
+    sessions = data.get("sessions_planned") or procedure.typical_sessions
+    if data.get("estimated_fee") in (None, ""):
+        # A per-session procedure is charged for every session, so the default estimate covers all of them.
+        per_session = procedure.billing_mode == DentalProcedure.BillingMode.PER_SESSION
+        fee = procedure.price * sessions if per_session else procedure.price
+    else:
+        fee = _money(data["estimated_fee"])
     sequence = data.get("sequence") or (max((i.sequence for i in plan.items.all()), default=0) + 1)
     item = TreatmentPlanItem.objects.create(
         plan=plan, sequence=sequence, procedure=procedure, diagnosis=diagnosis,
         priority=data.get("priority") or TreatmentPlanItem.Priority.ROUTINE,
-        sessions_planned=data.get("sessions_planned") or procedure.typical_sessions,
+        sessions_planned=sessions,
         estimated_minutes=data.get("estimated_minutes") or procedure.default_minutes, estimated_fee=fee,
         assigned_dentist=data.get("assigned_dentist"), notes=(data.get("notes") or "").strip()[:255], **where)
     _revise(ctx, plan, reason)
@@ -232,8 +255,7 @@ def add_item(ctx: ActorContext, plan: TreatmentPlan, data: dict, *, reason: str 
 
 @transaction.atomic
 def update_item(ctx: ActorContext, item: TreatmentPlanItem, data: dict, *, reason: str = "") -> TreatmentPlanItem:
-    item = TreatmentPlanItem.objects.select_for_update().get(pk=item.pk)
-    plan = _lock(item.plan)
+    item, plan = lock_item(item.pk)
     _require_open(plan)
     if item.status in (I.COMPLETED, I.CANCELLED):
         raise ConflictError("This item is finished and cannot be changed.")
@@ -272,8 +294,7 @@ def update_item(ctx: ActorContext, item: TreatmentPlanItem, data: dict, *, reaso
 @transaction.atomic
 def remove_item(ctx: ActorContext, item: TreatmentPlanItem, *, reason: str = "") -> None:
     """Draft plan: the item is deleted. Presented plan: the item is cancelled (kept, with the reason)."""
-    item = TreatmentPlanItem.objects.select_for_update().get(pk=item.pk)
-    plan = _lock(item.plan)
+    item, plan = lock_item(item.pk)
     _require_open(plan)
     if item.procedures.exists() or item.status in (I.IN_PROGRESS, I.COMPLETED):
         raise ConflictError("Work was already recorded against this item. Cancel the remaining sessions instead.")
@@ -288,11 +309,13 @@ def remove_item(ctx: ActorContext, item: TreatmentPlanItem, *, reason: str = "")
 
 @transaction.atomic
 def cancel_item(ctx: ActorContext, item: TreatmentPlanItem, *, reason: str) -> TreatmentPlanItem:
-    item = TreatmentPlanItem.objects.select_for_update().get(pk=item.pk)
-    plan = _lock(item.plan)
+    item, plan = lock_item(item.pk)
     _require_open(plan)
     if item.status in (I.COMPLETED, I.CANCELLED):
         raise ConflictError("This item is already finished.")
+    if _has_unsigned_record(item):
+        raise ConflictError(f"An unsigned procedure record is open for {item.procedure.name}. Sign it or discard "
+                            "it before cancelling the item.")
     if not reason.strip():
         raise BusinessValidationError("Give the reason.", fields={"reason": ["Required."]})
     item.status, item.cancel_reason = I.CANCELLED, reason.strip()[:255]
@@ -347,6 +370,9 @@ def record_decision(ctx: ActorContext, plan: TreatmentPlan, decisions: dict, *, 
             raise BusinessValidationError("Accepted, declined or deferred.", fields={"decisions": [str(decision)]})
         if item.status not in (I.PROPOSED, I.DEFERRED, I.DECLINED, I.ACCEPTED):
             raise ConflictError(f"{item.procedure.name} is already {item.get_status_display().lower()}.")
+        if decision != item.status and decision != I.ACCEPTED and _has_unsigned_record(item):
+            raise ConflictError(f"An unsigned procedure record is open for {item.procedure.name}. Sign it or "
+                                "discard it before recording that the patient declined or deferred it.")
         item.status, item.decision_at = decision, now
         item.save(update_fields=["status", "decision_at", "updated_at"])
     plan.decision_at, plan.decision_recorded_by = now, ctx.user
@@ -390,7 +416,7 @@ def close_plan(ctx: ActorContext, plan: TreatmentPlan, *, status: str, reason: s
 def link_appointment(ctx: ActorContext, item: TreatmentPlanItem, appointment: Appointment, *,
                      unlink: bool = False) -> TreatmentPlanItem:
     """Plan an item for a booked appointment. Booking never changes the item's status."""
-    item = TreatmentPlanItem.objects.select_for_update().select_related("plan").get(pk=item.pk)
+    item, _plan = lock_item(item.pk)
     if appointment.patient_id != item.plan.patient_id:
         raise BusinessValidationError("The appointment is for another patient.", fields={"appointment_id": ["Wrong patient."]})
     if unlink:
@@ -407,8 +433,8 @@ def link_appointment(ctx: ActorContext, item: TreatmentPlanItem, appointment: Ap
 
 
 def on_procedure_signed(ctx, item: TreatmentPlanItem, record_status: str) -> None:
-    """Called by procedures.sign_record inside its transaction."""
-    item = TreatmentPlanItem.objects.select_for_update().get(pk=item.pk)
+    """Called by procedures.sign_record inside its transaction (which already holds the plan and item locks)."""
+    item, plan = lock_item(item.pk)
     if record_status == "completed":
         item.status = I.COMPLETED
     elif record_status == "session_completed" and item.status != I.COMPLETED:
@@ -416,4 +442,4 @@ def on_procedure_signed(ctx, item: TreatmentPlanItem, record_status: str) -> Non
     else:
         return
     item.save(update_fields=["status", "updated_at"])
-    refresh_status(ctx, TreatmentPlan.objects.select_for_update().get(pk=item.plan_id))
+    refresh_status(ctx, plan)

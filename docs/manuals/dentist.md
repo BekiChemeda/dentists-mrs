@@ -41,7 +41,14 @@ medical history, and when it was last reviewed. The line is red only when there 
 
 Signing does not close the visit: the cashier and reception still finish it. After signing, a correction is made
 with **Amend** on the summary: choose the field, write the corrected text and the reason. The original stays
-visible.
+visible. Only the dentist who signed a record can amend it; if that dentist no longer works at the clinic (their
+account is switched off), another dentist can.
+
+When you sign a procedure record, the panel shows what the patient will be charged (the catalogue price) and the
+estimate the patient accepted. If the procedure has no price, or the price is not the accepted estimate, you must
+tick the confirmation before **Sign** works: the price cannot be changed after signing. While a procedure record
+for a plan item is unsigned, the patient's decision on that item cannot be changed to declined or deferred; sign
+or discard the record first.
 
 If two people change the same record, the second save is refused with *changed elsewhere*. Reload and make the
 change again; nothing is overwritten.

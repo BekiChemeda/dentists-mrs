@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from django.db.models import Prefetch, Q
-from django.http import HttpResponse
+from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from rest_framework import serializers, status
 from rest_framework.parsers import JSONParser, MultiPartParser
@@ -284,6 +284,7 @@ class ChartHistoryView(PermissionedView):
         qs = chart.findings_qs(patient)
         if tooth := request.query_params.get("tooth"):
             qs = qs.filter(tooth=int(tooth)) if tooth.isdigit() else qs.none()
+        _audit_view(self, "dental_chart.history_view", "patient", patient.pk, patient.pk)
         return Response(S.FindingSerializer(qs.order_by("-recorded_at")[:500], many=True).data)
 
 
@@ -295,6 +296,7 @@ class ChartCompareView(PermissionedView):
         a = get_object_or_404(DentalEncounter, pk=self.param_uuid("from"), patient=patient)
         b = get_object_or_404(DentalEncounter, pk=self.param_uuid("to"), patient=patient)
         diff = chart.compare(patient, chart.as_of_moment(patient, encounter=a), chart.as_of_moment(patient, encounter=b))
+        _audit_view(self, "dental_chart.compare_view", "patient", patient.pk, patient.pk)
         return Response({k: S.FindingSerializer(v, many=True).data for k, v in diff.items()})
 
 
@@ -306,6 +308,8 @@ class PatientDiagnosesView(PermissionedView):
               .select_related("recorded_by").order_by("-created_at"))
         if st := request.query_params.get("status"):
             qs = qs.filter(status=st)
+        patient = _patient(patient_id)
+        _audit_view(self, "dental_diagnoses.view", "patient", patient.pk, patient.pk)
         return Response(S.DiagnosisSerializer(qs[:300], many=True).data)
 
 
@@ -315,6 +319,8 @@ class PatientPerioView(PermissionedView):
     def get(self, request, patient_id):
         qs = (PeriodontalExam.objects.filter(patient_id=patient_id).select_related("examiner", "encounter")
               .prefetch_related("sites", "teeth").order_by("-created_at"))
+        patient = _patient(patient_id)
+        _audit_view(self, "dental_perio.view", "patient", patient.pk, patient.pk)
         return Response(S.PerioExamSerializer(qs[:30], many=True).data)
 
 
@@ -457,8 +463,13 @@ class PerioCompareView(PermissionedView):
     def get(self, request):
         a = get_object_or_404(PeriodontalExam, pk=self.param_uuid("a"))
         b = get_object_or_404(PeriodontalExam, pk=self.param_uuid("b"))
+        if a.patient_id != b.patient_id:
+            return Response({"error": {"code": "validation_error",
+                                       "message": "Both periodontal charts must belong to the same patient."}},
+                            status=400)
         if a.created_at > b.created_at:
             a, b = b, a
+        _audit_view(self, "dental_perio.compare_view", "patient", a.patient_id, a.patient_id)
         return Response(perio.compare(a, b))
 
 
@@ -578,8 +589,9 @@ class PlanItemView(PermissionedView):
 # Procedure records
 # ===========================================================================
 def _record_qs():
-    return ProcedureRecord.objects.select_related("procedure", "performed_by", "assisted_by", "signed_by",
-                                                  "created_by").prefetch_related("materials__item", "amendments__author")
+    return (ProcedureRecord.objects
+            .select_related("procedure", "performed_by", "assisted_by", "signed_by", "created_by", "plan_item")
+            .prefetch_related("materials__item", "amendments__author"))
 
 
 class EncounterProceduresView(PermissionedView):
@@ -645,7 +657,7 @@ class ProcedureRecordActionView(PermissionedView):
         if action == "sign":
             data = validated(S.SignProcedureInput, request.data)
             procedures.sign_record(ctx, rec, outcome=data["outcome"], reason=data["reason"],
-                                   create_recall=data["create_recall"])
+                                   create_recall=data["create_recall"], confirm_charge=data["confirm_charge"])
         elif action == "discard":
             procedures.discard_record(ctx, rec, str(request.data.get("reason", "")))
             return Response(status=status.HTTP_204_NO_CONTENT)
@@ -713,13 +725,18 @@ class ImageFileView(PermissionedView):
     required_permissions = {"GET": ("dental.imaging.view",)}
 
     def get(self, request, pk):
-        image = get_object_or_404(DentalImage, pk=pk, status=DentalImage.Status.ACTIVE)
+        image = get_object_or_404(DentalImage, pk=pk)
+        withdrawn = image.status != DentalImage.Status.ACTIVE
+        # A withdrawn image stays out of the clinical record, but whoever manages images can still open it
+        # (for example to check what was withdrawn, or for a complaint or legal review).
+        if withdrawn and not request.user.has_permissions(["dental.imaging.manage"]):
+            raise Http404
         preview = request.query_params.get("preview") == "1"
-        data = imaging.read(image, preview=preview)
+        fh = imaging.open_file(image, preview=preview)
         record_event(self.ctx(), action="dental_image.view", object_type="patient", object_id=image.patient_id,
-                     details={"image": str(image.pk), "preview": preview})
+                     details={"image": str(image.pk), "preview": preview, **({"withdrawn": True} if withdrawn else {})})
         ctype = "image/jpeg" if preview else image.content_type
-        resp = HttpResponse(data, content_type=ctype)
+        resp = FileResponse(fh, content_type=ctype)
         download = request.query_params.get("download") == "1" or (not preview and image.content_type == "image/tiff")
         name = image.original_name if not preview else f"preview-{image.pk}.jpg"
         resp["Content-Disposition"] = f'{"attachment" if download else "inline"}; filename="{name}"'

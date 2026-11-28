@@ -48,6 +48,16 @@ def own_open_encounter(ctx, encounter: DentalEncounter) -> DentalEncounter:
     return enc
 
 
+def check_amend_author(ctx, author, what: str) -> None:
+    """
+    A signed record is amended by the clinician who signed it. When that clinician's account is no longer active
+    (they left the clinic), another clinician with dental.amend may correct it; the amendment records who did.
+    """
+    if author is not None and author.pk != ctx.user.pk and author.is_active:
+        raise PermissionDeniedError(f"Only {author.full_name} can amend this {what}. Write your own note in a new "
+                                    f"examination, or ask them to amend it.")
+
+
 def same_patient(obj, patient_id, label: str) -> None:
     if obj is not None and obj.patient_id != patient_id:
         raise BusinessValidationError(f"The {label} belongs to another patient.", fields={label: ["Wrong patient."]})

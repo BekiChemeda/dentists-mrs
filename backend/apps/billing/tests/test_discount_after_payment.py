@@ -104,3 +104,14 @@ def test_staff_manager_sees_staff_creation_in_audit_but_not_sign_ins(staff):
     actions = [e["action"] for e in ok(staff.clinic_admin.get("/api/v1/audit-events/?page_size=200"))["results"]]
     assert "user.create" in actions
     assert not any(a.startswith("auth.") for a in actions)
+
+
+def test_second_discount_request_counts_the_one_already_waiting(staff):
+    inv = _issued(staff)
+    subtotal = Decimal(inv["subtotal"])
+    req = ok(_ask(staff, inv, 20), 201)
+    ok(staff.clinic_admin.post(f"/api/v1/approvals/{req['id']}/approve/"))  # approved, not applied yet
+    # Together with the approved 20 ETB this would discount more than the charges and block every payment.
+    r = _ask(staff, inv, subtotal)
+    assert r.status_code == 409 and "already waiting" in r.json()["error"]["message"]
+    ok(_ask(staff, inv, subtotal - 20), 201)

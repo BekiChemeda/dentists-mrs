@@ -184,6 +184,16 @@ def upload(ctx: ActorContext, patient: Patient, raw: bytes, original_name: str, 
     return image
 
 
+def open_file(image: DentalImage, *, preview: bool):
+    """The stored file opened for reading, so a large radiograph is streamed rather than read into memory."""
+    key = image.preview_key if preview and image.preview_key else image.storage_key
+    try:
+        return _path(key).open("rb")
+    except FileNotFoundError:
+        raise ConflictError("The image file is missing on the server. Tell the system administrator "
+                            "(restore it from backup).") from None
+
+
 def read(image: DentalImage, *, preview: bool) -> bytes:
     key = image.preview_key if preview and image.preview_key else image.storage_key
     try:

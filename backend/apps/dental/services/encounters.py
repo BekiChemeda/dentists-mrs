@@ -17,7 +17,7 @@ from ..models import (
     DentalProfileChange, MedicalRiskReview,
 )
 from ..starter_data import RISK_ANSWERS, RISK_QUESTION_KEYS
-from .common import location, own_open_encounter
+from .common import check_amend_author, location, own_open_encounter
 
 
 # ---------------------------------------------------------------------------
@@ -122,9 +122,10 @@ def sign_encounter(ctx: ActorContext, encounter: DentalEncounter) -> DentalEncou
 @transaction.atomic
 def amend_encounter(ctx: ActorContext, encounter: DentalEncounter, *, field_name: str, text: str,
                     reason: str) -> DentalEncounterAmendment:
-    enc = DentalEncounter.objects.select_for_update().get(pk=encounter.pk)
+    enc = DentalEncounter.objects.select_for_update(of=("self",)).select_related("dentist").get(pk=encounter.pk)
     if enc.status != DentalEncounter.Status.SIGNED:
         raise ConflictError("A draft is edited directly; amendments are for signed examinations.")
+    check_amend_author(ctx, enc.dentist, "examination")
     if field_name not in DentalEncounter.NOTE_FIELDS:
         raise BusinessValidationError("Unknown section.", fields={"field_name": ["Unknown section."]})
     if not reason.strip():
