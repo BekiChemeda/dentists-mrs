@@ -62,6 +62,14 @@ export function Banner({ tone = "info", children }: { tone?: Tone; children: Rea
  * Shows an API error. A save refused because someone else changed the record first gets its own
  * notice with a button that reloads the record; pass `onReload` to also discard the form's own copy.
  */
+/** One server validation message, readable: "items" + "line 2, drug_name: …" → "Line 2, drug name: …". */
+function fieldMessage(field: string, message: string): string {
+  const words = (x: string) => x.replace(/\b([a-z]+(?:_[a-z]+)+)\b/g, (w) => w.replace(/_/g, " "));
+  const lead = ["non_field_errors", "items", "lines", "detail"].includes(field) ? "" : `${words(field)}: `;
+  const text = `${lead}${words(message)}`;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 export function ErrorBanner({ error, onReload }: { error: unknown; onReload?: () => void }) {
   const { t } = useTranslation();
   if (!error) return null;
@@ -69,9 +77,21 @@ export function ErrorBanner({ error, onReload }: { error: unknown; onReload?: ()
   const message = error instanceof Error ? error.message : String(error);
   // A reference number only helps support with an unexpected failure, not with a message the user can act on.
   const ref = error instanceof ApiError && (error.status >= 500 || error.status === 0) ? error.requestId : undefined;
+  // "Invalid input." alone does not say what to fix: list what the server said about each field.
+  const details =
+    error instanceof ApiError && error.code === "validation_error"
+      ? Object.entries(error.fields).flatMap(([field, msgs]) => msgs.map((m) => fieldMessage(field, m)))
+      : [];
   return (
     <Banner tone="error">
-      {message}
+      {details.length > 0 ? t("common.check_fields", "Please correct the following:") : message}
+      {details.length > 0 && (
+        <ul className="error-details">
+          {details.map((d, i) => (
+            <li key={i}>{d}</li>
+          ))}
+        </ul>
+      )}
       {ref && <span className="small"> {t("common.error_reference", { id: ref })}</span>}
     </Banner>
   );

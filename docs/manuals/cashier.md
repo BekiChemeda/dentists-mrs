@@ -42,9 +42,12 @@ On the invoice click **Take payment**.
 2. **Method**: cash, telebirr, CBE Birr, bank transfer or card.
 3. For anything other than cash, type the **Transaction reference** from the patient's phone,
    the transfer slip or the card terminal. It is required.
-4. For cash, type **Cash received (optional)** to see the **Change to give**.
+4. For cash, type **Cash received (optional)** to see the **Change to give**. It must be at least the
+   amount paid.
 5. Click **Record payment**, then **Print receipt**. The receipt carries the clinic's details, TIN
-   and logo.
+   and logo. When you entered the cash received, it also shows **Cash received** and **Change given**.
+   **Balance after this payment** is what was still owed at that moment, so a reprinted receipt does not
+   change after later payments or refunds; money refunded from that payment is shown on its own line.
 
 ## 3. Discounts, voids and refunds (two-person rule)
 

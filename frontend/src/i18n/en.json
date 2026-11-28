@@ -186,6 +186,7 @@
     "empty": "No events match these filters."
   },
   "queue": {
+    "lane_finishing": "Finishing (payment, booking)",
     "doctor": "Dentist",
     "lane_doctor": "Waiting for dentists",
     "first_available": "First available dentist",

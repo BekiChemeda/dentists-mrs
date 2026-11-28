@@ -18,7 +18,7 @@ export function useGet<T>(
   });
 }
 
-/** A write that refreshes the listed query key prefixes when it succeeds. */
+/** A write that refreshes the listed query key prefixes when it succeeds, before reporting success. */
 export function useAction<TVars, TResult = unknown>(
   fn: (vars: TVars) => Promise<TResult>,
   invalidate: QueryKey[] = [],
@@ -28,8 +28,10 @@ export function useAction<TVars, TResult = unknown>(
   const client = useQueryClient();
   return useMutation({
     mutationFn: fn,
-    onSuccess: (result, vars) => {
-      for (const key of invalidate) void client.invalidateQueries({ queryKey: key });
+    // The refreshed data is waited for, so when the toast appears (and a dialog closes) the page already
+    // shows the change instead of the old state for a moment.
+    onSuccess: async (result, vars) => {
+      await Promise.all(invalidate.map((key) => client.invalidateQueries({ queryKey: key })));
       if (successMessage) toast(successMessage);
       onSuccess?.(result, vars);
     },

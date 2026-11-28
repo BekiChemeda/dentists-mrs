@@ -3915,3 +3915,9 @@ fieldset.form-group > legend {
   box-shadow: inset 3px 0 0 var(--brand);
   font-weight: 600;
 }
+
+/* Field-by-field list under a validation error. */
+.error-details {
+  margin: 4px 0 0;
+  padding-left: 20px;
+}

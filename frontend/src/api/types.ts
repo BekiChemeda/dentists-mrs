@@ -841,6 +841,11 @@ export interface Payment {
   amount: string;
   method: "cash" | "telebirr" | "cbe_birr" | "bank_transfer" | "card" | "insurance";
   reference: string;
+  /** Cash handed over (cash payments, when entered); change_given is what went back to the patient. */
+  amount_tendered?: string | null;
+  change_given?: string | null;
+  /** Owed right after this payment; empty on payments recorded before this was kept. */
+  balance_after?: string | null;
   received_by: PersonBrief;
   received_at: string;
   refunded?: string;

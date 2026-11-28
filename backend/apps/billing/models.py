@@ -125,6 +125,11 @@ class Payment(UUIDModel):
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     method = models.CharField(max_length=15, choices=Method.choices)
     reference = models.CharField(max_length=80, blank=True)
+    # Cash handed over by the patient, when the cashier entered it; the change given is the difference.
+    amount_tendered = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    # What was still owed right after this payment, as printed on the receipt (empty on payments made before
+    # this was recorded).
+    balance_after = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     received_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
     received_at = models.DateTimeField(auto_now_add=True)
 
