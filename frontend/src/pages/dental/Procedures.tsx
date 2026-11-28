@@ -428,7 +428,8 @@ export function ProcedureDetail({ id, onClose }: { id: string; onClose: () => vo
   const editable = draft && can("dental.procedure.record");
   const canSign = draft && can("dental.procedure.sign") && r.performed_by.id === user?.id;
   // Signing this outcome charges the patient (a per-session procedure charges every session).
-  const charged = outcome === "completed" || (outcome === "session_completed" && r.charge?.billing_mode === "per_session");
+  const charged =
+    outcome === "completed" || (outcome === "session_completed" && r.charge?.billing_mode === "per_session");
   const needsConfirm = charged && !!r.charge?.warning;
   const printId = `proc-print-${r.id}`;
   return (
@@ -568,7 +569,10 @@ export function ProcedureDetail({ id, onClose }: { id: string; onClose: () => vo
                     : t(
                         "dental.charge_differs",
                         "The invoice will use the catalogue price ({{total}} ETB), not the estimate the patient accepted ({{estimate}} ETB).",
-                        { total: money(r.charge.expected_total ?? r.charge.price), estimate: money(r.charge.estimate ?? "0") },
+                        {
+                          total: money(r.charge.expected_total ?? r.charge.price),
+                          estimate: money(r.charge.estimate ?? "0"),
+                        },
                       )}
                 </Banner>
               )}
